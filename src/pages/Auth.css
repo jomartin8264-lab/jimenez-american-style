@@ -1,0 +1,114 @@
+.auth-container {
+  min-height: calc(100vh - 80px); /* Minus navbar */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--color-bg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2.5rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  border-top: 4px solid var(--color-text);
+  transition: all 0.3s ease;
+}
+
+.auth-card.register-mode {
+  border-top: 4px solid var(--color-primary);
+  box-shadow: 0 10px 30px rgba(184, 134, 11, 0.2);
+}
+
+.auth-card h2 {
+  margin-bottom: 1.5rem;
+  text-align: center;
+  color: var(--color-text);
+  font-family: 'Outfit', serif;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-light);
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--color-text);
+  font-family: var(--font-main);
+  transition: border-color var(--transition-fast);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+}
+
+.w-100 {
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--color-text-light);
+  margin: 1.5rem 0;
+}
+
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-divider span {
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+
+.auth-switch {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-light);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.alert-error {
+  background-color: rgba(255, 59, 59, 0.1);
+  color: #ff3b3b;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.btn-register {
+  background-color: var(--color-primary);
+  color: var(--color-bg);
+  border: none;
+  font-weight: bold;
+}
+
+.btn-register:hover {
+  opacity: 0.9;
+}
