@@ -49,21 +49,29 @@ const Hero = () => {
             Descubre nuestra selección exclusiva de ropa americana. 
             Calidad premium, diseños modernos y piezas únicas para cada ocasión.
           </p>
-          <div className="hero-actions" style={{ position: 'relative', zIndex: 20 }}>
-            <button 
-              onClick={() => navigate('/catalog')} 
+          <div className="hero-actions" style={{ position: 'relative', zIndex: 999, pointerEvents: 'auto' }}>
+            <a 
+              href="/catalog" 
               className="btn btn-primary" 
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', textDecoration: 'none' }}
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = '/catalog';
+              }}
             >
               Comprar Ahora <ArrowRight size={18} />
-            </button>
-            <button 
-              onClick={() => navigate('/catalog')} 
+            </a>
+            <a 
+              href="/catalog" 
               className="btn btn-secondary glass" 
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textDecoration: 'none' }}
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = '/catalog';
+              }}
             >
               Ver Catálogo
-            </button>
+            </a>
           </div>
         </div>
       </div>

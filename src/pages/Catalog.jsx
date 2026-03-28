@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../contexts/CartContext';
+import Navbar from '../components/Navbar';
+import ProductCard from '../components/ProductCard';
 
 const Catalog = () => {
   const { products } = useCart();

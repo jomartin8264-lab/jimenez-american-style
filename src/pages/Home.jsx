@@ -50,13 +50,17 @@ const Home = () => {
                 <h2 style={{ fontSize: '2rem', fontFamily: 'Outfit', color: 'var(--color-text)', marginBottom: '0.5rem' }}>Lo Más Nuevo</h2>
                 <p style={{ color: 'var(--color-text-light)' }}>Explora las últimas tendencias en moda americana.</p>
               </div>
-              <button 
-                onClick={() => navigate('/catalog')} 
+              <a 
+                href="/catalog" 
                 className="btn btn-secondary" 
-                style={{ cursor: 'pointer', border: 'none' }}
+                style={{ cursor: 'pointer', textDecoration: 'none' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = '/catalog';
+                }}
               >
                 Ver todo
-              </button>
+              </a>
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '2rem' }}>
