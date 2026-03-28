@@ -1,12 +1,13 @@
 import React from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../contexts/CartContext';
-import { Link } from 'react-router-dom';
 
 const Home = () => {
   const { products } = useCart();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -49,7 +50,13 @@ const Home = () => {
                 <h2 style={{ fontSize: '2rem', fontFamily: 'Outfit', color: 'var(--color-text)', marginBottom: '0.5rem' }}>Lo Más Nuevo</h2>
                 <p style={{ color: 'var(--color-text-light)' }}>Explora las últimas tendencias en moda americana.</p>
               </div>
-              <Link to="/catalog" className="btn btn-secondary" style={{ textDecoration: 'none' }}>Ver todo</Link>
+              <button 
+                onClick={() => navigate('/catalog')} 
+                className="btn btn-secondary" 
+                style={{ cursor: 'pointer', border: 'none' }}
+              >
+                Ver todo
+              </button>
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '2rem' }}>

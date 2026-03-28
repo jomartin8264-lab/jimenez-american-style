@@ -1,8 +1,11 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import './Hero.css';
 
 const Hero = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="hero">
       <div className="hero-bg">
@@ -25,7 +28,7 @@ const Hero = () => {
       </div>
       
       <div className="container hero-content">
-        <div className="hero-text animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <div className="hero-text animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', position: 'relative', zIndex: 10 }}>
           <img 
             src="/images/logo.png" 
             alt="Jiménez American Style" 
@@ -46,13 +49,21 @@ const Hero = () => {
             Descubre nuestra selección exclusiva de ropa americana. 
             Calidad premium, diseños modernos y piezas únicas para cada ocasión.
           </p>
-          <div className="hero-actions">
-            <Link to="/catalog" className="btn btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="hero-actions" style={{ position: 'relative', zIndex: 20 }}>
+            <button 
+              onClick={() => navigate('/catalog')} 
+              className="btn btn-primary" 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+            >
               Comprar Ahora <ArrowRight size={18} />
-            </Link>
-            <Link to="/catalog" className="btn btn-secondary glass" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            </button>
+            <button 
+              onClick={() => navigate('/catalog')} 
+              className="btn btn-secondary glass" 
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
               Ver Catálogo
-            </Link>
+            </button>
           </div>
         </div>
       </div>
