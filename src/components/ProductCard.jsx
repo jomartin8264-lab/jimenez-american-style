@@ -7,6 +7,7 @@ import './ProductCard.css';
 const ProductCard = ({ product }) => {
   const { addToCart, cartItems } = useCart();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
   
   // Calcular piezas disponibles reales (Inventario total menos lo que ya tienes en el carrito)
   const itemInCart = cartItems.find(item => item.id === product.id);
@@ -16,6 +17,10 @@ const ProductCard = ({ product }) => {
   const handleQuickAdd = (e) => {
     e.stopPropagation(); // Evita abrir el modal al agregar directo al carrito
     addToCart(product);
+    setIsAdded(true);
+    setTimeout(() => {
+      setIsAdded(false);
+    }, 1500);
   };
 
   const handleOpenModal = () => {
@@ -36,26 +41,19 @@ const ProductCard = ({ product }) => {
                 }}
                 className="btn btn-secondary quick-view-btn"
                 style={{ 
-                  padding: '0.6rem', 
+                  padding: '0.6rem 1rem', 
                   borderRadius: '4px', 
-                  backgroundColor: 'rgba(255,255,255,0.1)', 
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  backgroundColor: 'rgba(255,255,255,0.2)', 
+                  border: '1px solid rgba(255,255,255,0.3)',
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  width: '100%',
+                  fontWeight: 'bold'
                 }}
-                title="Detalles"
               >
-                <Eye size={18} />
-              </button>
-              <button 
-                onClick={handleQuickAdd} 
-                disabled={effectiveStock <= 0}
-                className="btn btn-primary quick-add-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-              >
-                <ShoppingCart size={18} /> {effectiveStock <= 0 ? 'Sin stock' : 'Agregar'}
+                <Eye size={18} style={{ marginRight: '5px' }} /> Ver Detalles
               </button>
             </div>
           </div>
@@ -71,9 +69,39 @@ const ProductCard = ({ product }) => {
         </div>
         
         <div className="product-info">
-          <p className="product-brand">Jiménez</p>
+          <p className="product-brand">{product.category || 'Jiménez'}</p>
           <h3 className="product-title">{product.name}</h3>
-          <p className="product-price">${product.price.toFixed(2)}</p>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
+            <p className="product-price">${product.price.toFixed(2)}</p>
+            <span style={{ fontSize: '0.75rem', color: effectiveStock > 0 ? 'var(--color-text-light)' : '#ff3b3b' }}>
+              {effectiveStock > 0 ? `${effectiveStock} disp.` : 'Agotado'}
+            </span>
+          </div>
+
+          <button 
+            onClick={handleQuickAdd} 
+            disabled={effectiveStock <= 0 || isAdded}
+            className={`btn ${isAdded ? 'btn-success' : 'btn-primary'} quick-add-btn-visible`}
+            style={{ 
+              width: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '0.5rem',
+              padding: '0.6rem',
+              marginTop: '0.5rem',
+              backgroundColor: isAdded ? '#4caf50' : '',
+              color: isAdded ? 'white' : '',
+              border: isAdded ? 'none' : ''
+            }}
+          >
+            {isAdded ? (
+              <>¡Agregado! ✓</>
+            ) : (
+              <><ShoppingCart size={18} /> {effectiveStock <= 0 ? 'Sin stock' : 'Agregar al carrito'}</>
+            )}
+          </button>
         </div>
       </div>
 

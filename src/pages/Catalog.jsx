@@ -87,7 +87,7 @@ const Catalog = () => {
         </div>
 
         {/* GRID DE PRODUCTOS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1.5rem' }}>
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
