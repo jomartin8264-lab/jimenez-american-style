@@ -1,11 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import './Hero.css';
 
 const Hero = () => {
-  const navigate = useNavigate();
-
   return (
     <section className="hero">
       <div className="hero-bg">
@@ -50,28 +48,20 @@ const Hero = () => {
             Calidad premium, diseños modernos y piezas únicas para cada ocasión.
           </p>
           <div className="hero-actions" style={{ position: 'relative', zIndex: 999, pointerEvents: 'auto' }}>
-            <a 
-              href="/catalog" 
+            <Link 
+              to="/catalog" 
               className="btn btn-primary" 
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', textDecoration: 'none' }}
-              onClick={(e) => {
-                e.preventDefault();
-                window.location.href = '/catalog';
-              }}
             >
               Comprar Ahora <ArrowRight size={18} />
-            </a>
-            <a 
-              href="/catalog" 
+            </Link>
+            <Link 
+              to="/catalog" 
               className="btn btn-secondary glass" 
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textDecoration: 'none' }}
-              onClick={(e) => {
-                e.preventDefault();
-                window.location.href = '/catalog';
-              }}
             >
               Ver Catálogo
-            </a>
+            </Link>
           </div>
         </div>
       </div>

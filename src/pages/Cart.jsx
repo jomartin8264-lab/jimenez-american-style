@@ -4,19 +4,45 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import { Trash2 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, updateDoc, increment, writeBatch } from 'firebase/firestore';
-
-const TELEGRAM_TOKEN = '8521379806:AAEWEBEGbKFp7_lRozQKzLGRC1TjUuRRbqU';
-// ID automático obtenido desde la API
-const CHAT_ID = '8420282387'; 
+import { doc, getDoc, increment, writeBatch } from 'firebase/firestore';
+import useSEO from '../hooks/useSEO';
 
 const Cart = () => {
   const { cartItems, cartTotal, removeFromCart, updateQuantity, clearCart } = useCart();
+
+  useSEO({
+    title: 'Tu Carrito de Compra - Jiménez American Style',
+    description: 'Revisa y finaliza tu pedido de prendas exclusivas y recíbelo directamente a tu domicilio con envíos rápidos.'
+  });
   const { currentUser, userData } = useAuth();
   const [checkoutData, setCheckoutData] = useState({
     name: '', phone: '', address: '', notes: ''
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Cargar credenciales de Telegram dinámicamente desde Firestore o usar valores por defecto
+  const [apiSettings, setApiSettings] = useState({
+    telegramToken: '8521379806:AAEWEBEGbKFp7_lRozQKzLGRC1TjUuRRbqU',
+    telegramChatId: '8420282387'
+  });
+
+  useEffect(() => {
+    const fetchApiSettings = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "config", "apiSettings"));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setApiSettings({
+            telegramToken: data.telegramToken || '8521379806:AAEWEBEGbKFp7_lRozQKzLGRC1TjUuRRbqU',
+            telegramChatId: data.telegramChatId || '8420282387'
+          });
+        }
+      } catch (err) {
+        console.error("Error loading Telegram API settings from Firestore:", err);
+      }
+    };
+    fetchApiSettings();
+  }, []);
 
   useEffect(() => {
     if (userData) {
@@ -43,8 +69,7 @@ const Cart = () => {
     setIsProcessing(true);
     
     try {
-      // 1. FINAL ACCURACY CHECK (Is there still enough stock for ALL items?)
-      // We use a batch or individual checks. Given the scale, check each item.
+      // 1. VERIFICACIÓN DE INVENTARIO FINAL
       const stockUpdates = [];
       for (const item of cartItems) {
         const pRef = doc(db, "products", item.id);
@@ -57,14 +82,14 @@ const Cart = () => {
         stockUpdates.push({ ref: pRef, qty: item.quantity });
       }
 
-      // 2. ACTUALLY DECREMENT STOCK IN FIRESTORE
+      // 2. DECREMENTAR STOCK EN FIRESTORE EN UN LOTE (BATCH)
       const batch = writeBatch(db);
       stockUpdates.forEach(update => {
         batch.update(update.ref, { stock: increment(-update.qty) });
       });
       await batch.commit();
 
-      // 3. Create receipt message
+      // 3. Crear mensaje de recibo para Telegram
       let message = `🛒 *NUEVO PEDIDO - Jiménez American Style*\n\n`;
       message += `👤 *Cliente:* ${checkoutData.name} (${currentUser.email})\n`;
       message += `📞 *Teléfono:* ${checkoutData.phone}\n`;
@@ -73,20 +98,23 @@ const Cart = () => {
       
       message += `\n*Artículos:*\n`;
       cartItems.forEach(item => {
-        message += `- ${item.name} (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
+        message += `\n📦 *${item.name}* (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
+        message += `   ▪️ ID: \`${item.id}\`\n`;
+        if (item.code) message += `   ▪️ SKU: ${item.code}\n`;
+        if (item.image) message += `   ▪️ [🖼️ Ver Imagen de la Prenda](${item.image})\n`;
       });
       message += `\n💰 *TOTAL A COBRAR: $${cartTotal.toFixed(2)}*\n\n`;
       message += `Por favor contacta al cliente para procesar el pago o entrega.`;
 
-      // 4. Send Telegram
-      if (CHAT_ID === 'TU_CHAT_ID_AQUI') {
+      // 4. Enviar notificación por Telegram usando las credenciales dinámicas
+      if (apiSettings.telegramChatId === 'TU_CHAT_ID_AQUI') {
         alert("Pedido procesado (Simulación). El administrador aún no configura su CHAT_ID de Telegram.");
       } else {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        await fetch(`https://api.telegram.org/bot${apiSettings.telegramToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: CHAT_ID,
+            chat_id: apiSettings.telegramChatId,
             text: message,
             parse_mode: 'Markdown'
           })
@@ -105,7 +133,7 @@ const Cart = () => {
   return (
     <>
       <Navbar />
-      <div className="container" style={{ paddingTop: '100px', minHeight: '80vh' }}>
+      <div className="container" style={{ paddingTop: '100px', minHeight: '80vh', paddingBottom: '3rem' }}>
         <h2 style={{ fontFamily: 'Outfit', fontSize: '2rem', marginBottom: '2rem' }}>Tu Carrito</h2>
         
         {cartItems.length === 0 ? (
@@ -128,9 +156,9 @@ const Cart = () => {
                       max={item.stock || 10}
                       value={item.quantity} 
                       onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
-                      style={{ width: '50px', padding: '0.5rem' }}
+                      style={{ width: '60px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }}
                     />
-                    <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: '#ff3b3b', cursor: 'pointer' }}>
+                    <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: '#ff3b3b', cursor: 'pointer' }} aria-label="Eliminar del carrito">
                       <Trash2 size={24} />
                     </button>
                   </div>
@@ -154,19 +182,46 @@ const Cart = () => {
                   
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Nombre Completo</label>
-                    <input type="text" placeholder="Ej: Juan Pérez" required style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'white' }} value={checkoutData.name} onChange={e => setCheckoutData({...checkoutData, name: e.target.value})} />
+                    <input 
+                      type="text" 
+                      placeholder="Ej: Juan Pérez" 
+                      required 
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }} 
+                      value={checkoutData.name} 
+                      onChange={e => setCheckoutData({...checkoutData, name: e.target.value})} 
+                    />
                   </div>
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Teléfono (WhatsApp)</label>
-                    <input type="tel" placeholder="Ej: 331 123 4567" required style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'white' }} value={checkoutData.phone} onChange={e => setCheckoutData({...checkoutData, phone: e.target.value})} />
+                    <input 
+                      type="tel" 
+                      placeholder="Ej: 331 123 4567" 
+                      required 
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }} 
+                      value={checkoutData.phone} 
+                      onChange={e => setCheckoutData({...checkoutData, phone: e.target.value})} 
+                    />
                   </div>
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Dirección de Entrega</label>
-                    <input type="text" placeholder="Calle, Número y Colonia" required style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'white' }} value={checkoutData.address} onChange={e => setCheckoutData({...checkoutData, address: e.target.value})} />
+                    <input 
+                      type="text" 
+                      placeholder="Calle, Número y Colonia" 
+                      required 
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }} 
+                      value={checkoutData.address} 
+                      onChange={e => setCheckoutData({...checkoutData, address: e.target.value})} 
+                    />
                   </div>
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Observaciones (Opcional)</label>
-                    <input type="text" placeholder="Referencias o preferencia de horario" style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'white' }} value={checkoutData.notes} onChange={e => setCheckoutData({...checkoutData, notes: e.target.value})} />
+                    <input 
+                      type="text" 
+                      placeholder="Referencias o preferencia de horario" 
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }} 
+                      value={checkoutData.notes} 
+                      onChange={e => setCheckoutData({...checkoutData, notes: e.target.value})} 
+                    />
                   </div>
 
                   <button 
@@ -175,7 +230,7 @@ const Cart = () => {
                     className="btn btn-primary w-100" 
                     style={{ fontSize: '1.1rem', padding: '1rem' }}
                   >
-                    {isProcessing ? 'Procesando...' : 'Finalizar Pedido por Telegram'}
+                    {isProcessing ? 'Procesando...' : 'Finalizar Pedido'}
                   </button>
                 </form>
               </div>

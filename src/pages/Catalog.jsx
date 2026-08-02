@@ -4,9 +4,15 @@ import { db } from '../firebase';
 import { useCart } from '../contexts/CartContext';
 import Navbar from '../components/Navbar';
 import ProductCard from '../components/ProductCard';
+import useSEO from '../hooks/useSEO';
 
 const Catalog = () => {
   const { products } = useCart();
+
+  useSEO({
+    title: 'Catálogo de Ropa - Jiménez American Style',
+    description: 'Explora nuestro catálogo en tiempo real con prendas americanas para dama, caballero, niños y accesorios exclusivos.'
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [categories, setCategories] = useState(['Todos', 'Dama', 'Caballero', 'Niños', 'Accesorios', 'Otros']);

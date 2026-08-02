@@ -3,8 +3,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import './Auth.css';
+import useSEO from '../hooks/useSEO';
 
 const Login = () => {
+  useSEO({
+    title: 'Iniciar Sesión / Registro - Jiménez American Style',
+    description: 'Accede a tu cuenta de cliente en Jiménez American Style para comprar y gestionar tus pedidos de manera rápida y segura.'
+  });
   const [isLogin, setIsLogin] = useState(true); // Renamed to isRegistering in diff, but keeping isLogin for consistency with existing JSX
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

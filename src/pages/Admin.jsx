@@ -5,8 +5,13 @@ import Navbar from '../components/Navbar';
 import { db } from '../firebase';
 import { doc, updateDoc, getDoc, setDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import './Admin.css';
+import useSEO from '../hooks/useSEO';
 
 const Admin = () => {
+  useSEO({
+    title: 'Panel de Administración - Jiménez American Style',
+    description: 'Panel exclusivo para el administrador. Gestiona el catálogo de productos, existencias, configuraciones de API y accesos.'
+  });
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   
@@ -17,11 +22,23 @@ const Admin = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [savingInfo, setSavingInfo] = useState(false);
+  const [savingApi, setSavingApi] = useState(false);
   const [imageFile, setImageFile] = useState(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Categories States
   const [categories, setCategories] = useState([]);
   const [newCatName, setNewCatName] = useState('');
+
+  // API settings state (Telegram + ImgBB)
+  const [apiSettings, setApiSettings] = useState({
+    telegramToken: '8521379806:AAEWEBEGbKFp7_lRozQKzLGRC1TjUuRRbqU',
+    telegramChatId: '8420282387',
+    imgbbApiKey: 'fab6ce338dcb4e9eeb8ff9a89e463876'
+  });
 
   // Form states
   const [newProduct, setNewProduct] = useState({
@@ -67,6 +84,7 @@ const Admin = () => {
           fetchProducts();
           fetchStoreInfo();
           fetchCategories();
+          fetchApiSettings();
           setCheckingAccess(false);
         }
       } catch (err) {
@@ -84,6 +102,8 @@ const Admin = () => {
       querySnapshot.forEach((doc) => {
         items.push({ id: doc.id, ...doc.data() });
       });
+      // Sort by newest first (assuming createdAt exists, otherwise just reverse)
+      items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setProducts(items);
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -121,6 +141,22 @@ const Admin = () => {
     }
   };
 
+  const fetchApiSettings = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, "config", "apiSettings"));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setApiSettings({
+          telegramToken: data.telegramToken || '8521379806:AAEWEBEGbKFp7_lRozQKzLGRC1TjUuRRbqU',
+          telegramChatId: data.telegramChatId || '8420282387',
+          imgbbApiKey: data.imgbbApiKey || 'fab6ce338dcb4e9eeb8ff9a89e463876'
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching API settings:", error);
+    }
+  };
+
   // Actions
   const handleAddCategory = async (e) => {
     e.preventDefault();
@@ -146,9 +182,9 @@ const Admin = () => {
   const uploadToImgBB = async (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    const IMGBB_API_KEY = "fab6ce338dcb4e9eeb8ff9a89e463876"; 
+    const key = apiSettings.imgbbApiKey || "fab6ce338dcb4e9eeb8ff9a89e463876"; 
     try {
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
         method: 'POST',
         body: formData
       });
@@ -164,7 +200,14 @@ const Admin = () => {
     setLoading(true);
     try {
       let uploadedUrl = null;
-      if (imageFile) uploadedUrl = await uploadToImgBB(imageFile);
+      if (imageFile) {
+        uploadedUrl = await uploadToImgBB(imageFile);
+        if (!uploadedUrl) {
+          alert("Error al subir la imagen a ImgBB. Verifica tu API Key.");
+          setLoading(false);
+          return;
+        }
+      }
 
       if (editingId) {
         const updateData = { ...editForm, price: Number(editForm.price), stock: Number(editForm.stock) };
@@ -230,6 +273,19 @@ const Admin = () => {
     setSavingInfo(false);
   };
 
+  const handleSaveApiSettings = async (e) => {
+    e.preventDefault();
+    setSavingApi(true);
+    try {
+      await setDoc(doc(db, "config", "apiSettings"), apiSettings, { merge: true });
+      alert("Configuración de APIs y Telegram actualizada correctamente.");
+    } catch (err) {
+      alert("Error al guardar la configuración de APIs.");
+      console.error(err);
+    }
+    setSavingApi(false);
+  };
+
   const handleAddAdmin = async (e) => {
     e.preventDefault();
     const email = newAdmin.trim().toLowerCase();
@@ -291,7 +347,7 @@ const Admin = () => {
                     value={editingId ? editForm.category : newProduct.category}
                     onChange={(e) => editingId ? setEditForm({...editForm, category: e.target.value}) : setNewProduct({...newProduct, category: e.target.value})}
                     className="input-field"
-                    style={{ backgroundColor: 'var(--color-surface)', color: 'white' }}
+                    style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
                   >
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
@@ -302,21 +358,36 @@ const Admin = () => {
                   <input type="file" onChange={(e) => setImageFile(e.target.files[0])} className="input-field" />
                 </div>
 
-                <button disabled={loading} type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                  {loading ? 'Procesando...' : (editingId ? 'Guardar Cambios' : 'Publicar')}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                  <button disabled={loading} type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                    {loading ? 'Procesando...' : (editingId ? 'Guardar Cambios' : 'Publicar')}
+                  </button>
+                  {editingId && (
+                    <button 
+                      type="button" 
+                      onClick={clearForm} 
+                      className="btn" 
+                      style={{ flex: 1, backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
 
             <div className="admin-card glass">
               <h2>Inventario</h2>
               <div className="inventory-list">
-                {products.map(p => (
-                  <div key={p.id} className="inventory-item">
-                    <div className="inventory-info">
-                      <strong>{p.name}</strong>
+                {products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
+                  <div key={p.id} className="inventory-item" style={{ display: 'flex', alignItems: 'center' }}>
+                    {p.image && (
+                      <img src={p.image} alt={p.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                    )}
+                    <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
+                      <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-                        ${p.price} | Stock: {p.stock} | <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
+                        ${p.price} | Stock: {p.stock} | SKU: {p.code || 'N/A'} | <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
@@ -326,6 +397,28 @@ const Admin = () => {
                   </div>
                 ))}
               </div>
+              {/* Controles de paginación */}
+              {products.length > itemsPerPage && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '1.5rem', alignItems: 'center' }}>
+                  <button 
+                    disabled={currentPage === 1} 
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="btn btn-sm"
+                  >
+                    Anterior
+                  </button>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-text-light)' }}>
+                    Página {currentPage} de {Math.ceil(products.length / itemsPerPage)}
+                  </span>
+                  <button 
+                    disabled={currentPage === Math.ceil(products.length / itemsPerPage)} 
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="btn btn-sm"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -337,7 +430,7 @@ const Admin = () => {
             </form>
             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
               {categories.map(c => (
-                <span key={c} style={{ padding: '5px 15px', border: '1px solid #333', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span key={c} style={{ padding: '5px 15px', border: '1px solid var(--color-border)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {c} <b onClick={() => handleRemoveCategory(c)} style={{ color: 'red', cursor: 'pointer' }}>×</b>
                 </span>
               ))}
@@ -347,13 +440,79 @@ const Admin = () => {
           <div className="admin-card glass" style={{ marginTop: '2rem' }}>
             <h2>Empresa y Contacto</h2>
             <form onSubmit={handleSaveStoreInfo} className="admin-form">
-              <textarea value={storeInfo.description} onChange={(e) => setStoreInfo({...storeInfo, description: e.target.value})} className="input-field" rows="3" />
+              <div className="form-group">
+                <label>Descripción de Nosotros</label>
+                <textarea value={storeInfo.description} onChange={(e) => setStoreInfo({...storeInfo, description: e.target.value})} className="input-field" rows="3" />
+              </div>
               <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '10px' }}>
-                <input type="text" value={storeInfo.address} onChange={(e) => setStoreInfo({...storeInfo, address: e.target.value})} className="input-field" placeholder="Dirección" title="Dirección" aria-label="Dirección" />
-                <input type="text" value={storeInfo.phone} onChange={(e) => setStoreInfo({...storeInfo, phone: e.target.value})} className="input-field" placeholder="Teléfono" title="Teléfono" aria-label="Teléfono" />
+                <div className="form-group">
+                  <label>Dirección</label>
+                  <input type="text" value={storeInfo.address} onChange={(e) => setStoreInfo({...storeInfo, address: e.target.value})} className="input-field" placeholder="Dirección" />
+                </div>
+                <div className="form-group">
+                  <label>Teléfono (WhatsApp)</label>
+                  <input type="text" value={storeInfo.phone} onChange={(e) => setStoreInfo({...storeInfo, phone: e.target.value})} className="input-field" placeholder="Teléfono" />
+                </div>
               </div>
               <button disabled={savingInfo} type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>{savingInfo ? 'Guardando...' : 'Actualizar'}</button>
             </form>
+          </div>
+
+          <div className="admin-card glass" style={{ marginTop: '2rem' }}>
+            <h2>🔧 Configuración del Sistema (APIs y Canales)</h2>
+            <form onSubmit={handleSaveApiSettings} className="admin-form">
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label>Telegram Bot Token</label>
+                <input 
+                  type="text" 
+                  value={apiSettings.telegramToken} 
+                  onChange={(e) => setApiSettings({...apiSettings, telegramToken: e.target.value})} 
+                  className="input-field" 
+                  placeholder="Bot Token"
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label>Telegram Chat ID</label>
+                <input 
+                  type="text" 
+                  value={apiSettings.telegramChatId} 
+                  onChange={(e) => setApiSettings({...apiSettings, telegramChatId: e.target.value})} 
+                  className="input-field" 
+                  placeholder="Chat ID"
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label>ImgBB API Key (Subida de Imágenes)</label>
+                <input 
+                  type="text" 
+                  value={apiSettings.imgbbApiKey} 
+                  onChange={(e) => setApiSettings({...apiSettings, imgbbApiKey: e.target.value})} 
+                  className="input-field" 
+                  placeholder="API Key de ImgBB"
+                />
+              </div>
+              <button disabled={savingApi} type="submit" className="btn btn-primary">
+                {savingApi ? 'Guardando...' : 'Actualizar Llaves'}
+              </button>
+            </form>
+          </div>
+
+          <div className="admin-card glass" style={{ marginTop: '2rem' }}>
+            <h2>Admins Autorizados</h2>
+            <form onSubmit={handleAddAdmin} style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+              <input type="email" value={newAdmin} onChange={(e) => setNewAdmin(e.target.value)} className="input-field" placeholder="Correo electrónico del nuevo administrador" />
+              <button type="submit" className="btn btn-primary">Añadir</button>
+            </form>
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {adminList.map(email => (
+                <span key={email} style={{ padding: '5px 15px', border: '1px solid var(--color-border)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {email} 
+                  {email !== 'jomartin8264@gmail.com' && (
+                    <b onClick={() => handleRemoveAdmin(email)} style={{ color: 'red', cursor: 'pointer' }}>×</b>
+                  )}
+                </span>
+              ))}
+            </div>
           </div>
 
         </div>

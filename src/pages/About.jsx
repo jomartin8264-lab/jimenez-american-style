@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import useSEO from '../hooks/useSEO';
 
 const About = () => {
+  useSEO({
+    title: 'Sobre Nosotros - Jiménez American Style',
+    description: 'Conoce más sobre nuestra pasión por la moda americana premium, nuestra tienda física, dirección, redes sociales y contacto oficial.'
+  });
   const [storeInfo, setStoreInfo] = useState({
     description: 'Cargando información...',
     address: '',

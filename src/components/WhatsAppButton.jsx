@@ -3,7 +3,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const WhatsAppButton = () => {
-  const [phone, setPhone] = useState("523113950371"); // Default from user request
+  const [phone, setPhone] = useState("52311109081"); // Updated temporary default number
 
   useEffect(() => {
     const fetchPhone = async () => {
@@ -11,7 +11,11 @@ const WhatsAppButton = () => {
         const docSnap = await getDoc(doc(db, "config", "storeInfo"));
         if (docSnap.exists() && docSnap.data().phone) {
           // Remove non-numeric characters for the link
-          const cleanPhone = docSnap.data().phone.replace(/\D/g, '');
+          let cleanPhone = docSnap.data().phone.replace(/\D/g, '');
+          // If it's a 10-digit Mexican number, add the 52 prefix
+          if (cleanPhone.length === 10) {
+            cleanPhone = '52' + cleanPhone;
+          }
           if (cleanPhone) setPhone(cleanPhone);
         }
       } catch (err) {
