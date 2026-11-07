@@ -1,0 +1,66 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
+
+const PORT = 4500;
+const distPath = path.join(__dirname, 'dist');
+
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
+
+const server = http.createServer((req, res) => {
+  let reqPath = decodeURI(req.url.split('?')[0]);
+  if (reqPath === '/') reqPath = '/index.html';
+
+  let filePath = path.join(distPath, reqPath);
+
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    fs.createReadStream(filePath).pipe(res);
+  } else {
+    // SPA Fallback para React Router
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      fs.createReadStream(indexPath).pipe(res);
+    } else {
+      res.writeHead(404);
+      res.end('Archivo index.html no encontrado. Ejecuta npm run build.');
+    }
+  }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`===============================================`);
+  console.log(`  Punto de Venta Alina iniciado en puerto ${PORT}`);
+  console.log(`===============================================`);
+
+  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+  
+  const appUrl = `http://localhost:${PORT}/pos`;
+  
+  let browserCmd;
+  if (fs.existsSync(chromePath)) {
+    browserCmd = `"${chromePath}" --app="${appUrl}"`;
+  } else if (fs.existsSync(edgePath)) {
+    browserCmd = `"${edgePath}" --app="${appUrl}"`;
+  } else {
+    browserCmd = `start ${appUrl}`;
+  }
+
+  exec(browserCmd);
+});

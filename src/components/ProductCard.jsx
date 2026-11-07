@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingCart, Eye } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import ProductModal from './ProductModal';
+import { getProductImage } from '../utils/productImages';
 import './ProductCard.css';
 
 const ProductCard = ({ product }) => {
@@ -31,7 +32,12 @@ const ProductCard = ({ product }) => {
     <>
       <div className="product-card" onClick={handleOpenModal} style={{ cursor: 'pointer' }}>
         <div className="product-image-container">
-          <img src={product.image} alt={product.name} className="product-image" />
+          <img 
+            src={getProductImage(product)} 
+            alt={product.name} 
+            className="product-image"
+            onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+          />
           <div className="product-overlay">
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button 

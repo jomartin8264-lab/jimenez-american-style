@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, ShoppingCart, Info, Tag, Layers } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { getProductImage } from '../utils/productImages';
 import './ProductModal.css';
 
 const ProductModal = ({ product, isOpen, onClose }) => {
@@ -32,7 +33,12 @@ const ProductModal = ({ product, isOpen, onClose }) => {
 
         <div className="modal-body">
           <div className="modal-image-wrapper">
-            <img src={product.image} alt={product.name} className="modal-image" />
+            <img 
+              src={getProductImage(product)} 
+              alt={product.name} 
+              className="modal-image" 
+              onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+            />
             {product.stock <= 0 && <span className="modal-badge out-of-stock">Agotado</span>}
             {effectiveStock <= 0 && product.stock > 0 && <span className="modal-badge in-cart">En tu Carrito</span>}
           </div>

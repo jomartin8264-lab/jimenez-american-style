@@ -6,6 +6,8 @@ import { db } from '../firebase';
 import { doc, updateDoc, getDoc, setDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import './Admin.css';
 import useSEO from '../hooks/useSEO';
+import BarcodeModal from '../components/BarcodeModal';
+import { getProductImage, compressImageToBase64 } from '../utils/productImages';
 
 const Admin = () => {
   useSEO({
@@ -24,6 +26,7 @@ const Admin = () => {
   const [savingInfo, setSavingInfo] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
   const [imageFile, setImageFile] = useState(null);
+  const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,9 +43,15 @@ const Admin = () => {
     imgbbApiKey: 'fab6ce338dcb4e9eeb8ff9a89e463876'
   });
 
+  const generateAutoSKU = () => {
+    const random = Math.floor(1000 + Math.random() * 9000);
+    const datePart = Date.now().toString().slice(-4);
+    return `ALN-${datePart}${random}`;
+  };
+
   // Form states
   const [newProduct, setNewProduct] = useState({
-    name: '', price: '', stock: '', code: '', image: '', category: ''
+    name: '', price: '', stock: '', code: generateAutoSKU(), image: '', category: ''
   });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -201,39 +210,49 @@ const Admin = () => {
     try {
       let uploadedUrl = null;
       if (imageFile) {
-        uploadedUrl = await uploadToImgBB(imageFile);
+        uploadedUrl = await compressImageToBase64(imageFile);
         if (!uploadedUrl) {
-          alert("Error al subir la imagen a ImgBB. Verifica tu API Key.");
+          uploadedUrl = await uploadToImgBB(imageFile);
+        }
+        if (!uploadedUrl) {
+          alert("Error al procesar la imagen seleccionada.");
           setLoading(false);
           return;
         }
       }
 
       if (editingId) {
-        const updateData = { ...editForm, price: Number(editForm.price), stock: Number(editForm.stock) };
+        const updateData = { 
+          ...editForm, 
+          code: (editForm.code && editForm.code.trim()) ? editForm.code.trim() : generateAutoSKU(),
+          price: Number(editForm.price), 
+          stock: Number(editForm.stock) 
+        };
         if (uploadedUrl) updateData.image = uploadedUrl;
         await updateDoc(doc(db, "products", editingId), updateData);
-        alert("¡Actualizado!");
+        alert("¡Prenda actualizada!");
         setEditingId(null);
       } else {
         if (!uploadedUrl) {
-          alert("Sube una imagen.");
+          alert("Por favor selecciona o toma una foto de la prenda.");
           setLoading(false);
           return;
         }
+        const productCode = (newProduct.code && newProduct.code.trim()) ? newProduct.code.trim() : generateAutoSKU();
         await addDoc(collection(db, "products"), {
           ...newProduct,
+          code: productCode,
           image: uploadedUrl,
           price: Number(newProduct.price),
           stock: Number(newProduct.stock),
           createdAt: new Date().toISOString()
         });
-        alert("¡Publicado!");
+        alert(`¡Prenda publicada con éxito! Código asignado: ${productCode}`);
       }
       clearForm();
       fetchProducts();
     } catch (error) {
-      alert("Error al guardar");
+      alert("Error al guardar: " + (error.message || error));
     }
     setLoading(false);
   };
@@ -244,7 +263,7 @@ const Admin = () => {
       name: product.name,
       price: product.price,
       stock: product.stock,
-      code: product.code || '',
+      code: product.code || generateAutoSKU(),
       image: product.image,
       category: product.category || categories[0]
     });
@@ -260,7 +279,7 @@ const Admin = () => {
   };
 
   const clearForm = () => {
-    setNewProduct({ name: '', price: '', stock: '', code: '', image: '', category: categories[0] || '' });
+    setNewProduct({ name: '', price: '', stock: '', code: generateAutoSKU(), image: '', category: categories[0] || '' });
     setEditingId(null);
     setImageFile(null);
   };
@@ -314,7 +333,16 @@ const Admin = () => {
       <Navbar />
       <div className="admin-container" style={{ paddingTop: '100px', paddingBottom: '50px' }}>
         <div className="container">
-          <h1 style={{ color: 'var(--color-primary)', marginBottom: '2rem' }}>Panel de Administración</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h1 style={{ color: 'var(--color-primary)', margin: 0 }}>Panel de Administración</h1>
+            <button 
+              onClick={() => navigate('/pos')}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#38bdf8', color: '#0f172a', fontWeight: 'bold' }}
+            >
+              🏪 Abrir Punto de Venta (Mostrador)
+            </button>
+          </div>
           
           <div className="admin-grid">
             <div className="admin-card glass">
@@ -337,8 +365,30 @@ const Admin = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>SKU</label>
-                  <input type="text" value={editingId ? editForm.code : newProduct.code} onChange={(e) => editingId ? setEditForm({...editForm, code: e.target.value}) : setNewProduct({...newProduct, code: e.target.value})} className="input-field" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <label style={{ margin: 0 }}>Código de Barras / SKU (Automático)</label>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const auto = generateAutoSKU();
+                        if (editingId) setEditForm(prev => ({ ...prev, code: auto }));
+                        else setNewProduct(prev => ({ ...prev, code: auto }));
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      🔄 Generar nuevo
+                    </button>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={editingId ? editForm.code : newProduct.code} 
+                    onChange={(e) => editingId ? setEditForm({...editForm, code: e.target.value}) : setNewProduct({...newProduct, code: e.target.value})} 
+                    className="input-field" 
+                    placeholder="Se genera automáticamente"
+                  />
+                  <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                    Este código se usará para generar la etiqueta imprimible y cobrar con lector.
+                  </small>
                 </div>
 
                 <div className="form-group">
@@ -354,8 +404,19 @@ const Admin = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Imagen</label>
-                  <input type="file" onChange={(e) => setImageFile(e.target.files[0])} className="input-field" />
+                  <label>📸 Foto de la Prenda (Tomar con celular o elegir archivo)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files[0])} 
+                    className="input-field" 
+                    style={{ padding: '0.6rem' }}
+                  />
+                  {imageFile && (
+                    <div style={{ marginTop: '0.5rem', color: '#34d399', fontSize: '0.85rem' }}>
+                      ✓ Foto seleccionada: {imageFile.name}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
@@ -382,7 +443,12 @@ const Admin = () => {
                 {products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
                   <div key={p.id} className="inventory-item" style={{ display: 'flex', alignItems: 'center' }}>
                     {p.image && (
-                      <img src={p.image} alt={p.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                      <img 
+                        src={getProductImage(p)} 
+                        alt={p.name} 
+                        style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} 
+                        onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+                      />
                     )}
                     <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
                       <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
@@ -391,6 +457,15 @@ const Admin = () => {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedBarcodeProduct(p)} 
+                        className="btn btn-sm" 
+                        title="Imprimir código de barras"
+                        style={{ backgroundColor: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}
+                      >
+                        🏷️ Barcode
+                      </button>
                       <button onClick={() => handleEdit(p)} className="btn btn-sm">Edit</button>
                       <button onClick={() => handleDelete(p.id)} className="btn btn-danger btn-sm">X</button>
                     </div>
@@ -517,6 +592,13 @@ const Admin = () => {
 
         </div>
       </div>
+
+      {selectedBarcodeProduct && (
+        <BarcodeModal 
+          product={selectedBarcodeProduct} 
+          onClose={() => setSelectedBarcodeProduct(null)} 
+        />
+      )}
     </>
   );
 };

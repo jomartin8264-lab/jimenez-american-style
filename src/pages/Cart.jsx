@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import { Trash2 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, increment, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, increment, writeBatch, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import useSEO from '../hooks/useSEO';
 
 const Cart = () => {
@@ -89,42 +89,68 @@ const Cart = () => {
       });
       await batch.commit();
 
-      // 3. Crear mensaje de recibo para Telegram
-      let message = `🛒 *NUEVO PEDIDO - Jiménez American Style*\n\n`;
-      message += `👤 *Cliente:* ${checkoutData.name} (${currentUser.email})\n`;
-      message += `📞 *Teléfono:* ${checkoutData.phone}\n`;
-      message += `🏠 *Dirección:* ${checkoutData.address}\n`;
-      if (checkoutData.notes) message += `📝 *Observaciones:* ${checkoutData.notes}\n`;
-      
-      message += `\n*Artículos:*\n`;
-      cartItems.forEach(item => {
-        message += `\n📦 *${item.name}* (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
-        message += `   ▪️ ID: \`${item.id}\`\n`;
-        if (item.code) message += `   ▪️ SKU: ${item.code}\n`;
-        if (item.image) message += `   ▪️ [🖼️ Ver Imagen de la Prenda](${item.image})\n`;
-      });
-      message += `\n💰 *TOTAL A COBRAR: $${cartTotal.toFixed(2)}*\n\n`;
-      message += `Por favor contacta al cliente para procesar el pago o entrega.`;
-
-      // 4. Enviar notificación por Telegram usando las credenciales dinámicas
-      if (apiSettings.telegramChatId === 'TU_CHAT_ID_AQUI') {
-        alert("Pedido procesado (Simulación). El administrador aún no configura su CHAT_ID de Telegram.");
-      } else {
-        await fetch(`https://api.telegram.org/bot${apiSettings.telegramToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: apiSettings.telegramChatId,
-            text: message,
-            parse_mode: 'Markdown'
-          })
+      // 2.5 Guardar orden en Firestore (si las reglas de la base de datos lo permiten)
+      try {
+        await addDoc(collection(db, "orders"), {
+          clientName: checkoutData.name,
+          clientEmail: currentUser.email,
+          clientPhone: checkoutData.phone,
+          clientAddress: checkoutData.address,
+          clientNotes: checkoutData.notes || '',
+          items: cartItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: Number(item.price),
+            quantity: Number(item.quantity),
+            code: item.code || '',
+            image: item.image || ''
+          })),
+          total: Number(cartTotal),
+          status: 'pendiente',
+          type: 'web',
+          createdAt: serverTimestamp(),
+          createdAtMillis: Date.now()
         });
-        alert("¡Tu pedido ha sido enviado con éxito! Nos pondremos en contacto pronto.");
+      } catch (orderDbErr) {
+        console.warn("Aviso: 'orders' en Firestore requiere actualizar reglas de seguridad:", orderDbErr);
       }
+
+      // 3. Notificación a Telegram (en bloque aislado para que no bloquee el pedido si falla)
+      try {
+        if (apiSettings.telegramChatId && apiSettings.telegramChatId !== 'TU_CHAT_ID_AQUI') {
+          let message = `🛒 *NUEVO PEDIDO - Jiménez American Style*\n\n`;
+          message += `👤 *Cliente:* ${checkoutData.name} (${currentUser.email})\n`;
+          message += `📞 *Teléfono:* ${checkoutData.phone}\n`;
+          message += `🏠 *Dirección:* ${checkoutData.address}\n`;
+          if (checkoutData.notes) message += `📝 *Observaciones:* ${checkoutData.notes}\n`;
+          
+          message += `\n*Artículos:*\n`;
+          cartItems.forEach(item => {
+            message += `\n📦 *${item.name}* (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
+            if (item.code) message += `   ▪️ SKU: ${item.code}\n`;
+          });
+          message += `\n💰 *TOTAL A COBRAR: $${cartTotal.toFixed(2)}*\n\n`;
+          message += `Por favor contacta al cliente para procesar el pago o entrega.`;
+
+          await fetch(`https://api.telegram.org/bot${apiSettings.telegramToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: apiSettings.telegramChatId,
+              text: message,
+              parse_mode: 'Markdown'
+            })
+          });
+        }
+      } catch (tgErr) {
+        console.warn("Aviso de Telegram no enviado:", tgErr);
+      }
+
+      alert("¡Tu pedido ha sido enviado con éxito! En breve te contactaremos.");
       clearCart();
     } catch (error) {
-      console.error(error);
-      alert("Hubo un error procesando el pedido. Por favor inténtalo de nuevo.");
+      console.error("Error en checkout:", error);
+      alert("Hubo un error procesando el pedido: " + (error.message || error));
     }
     
     setIsProcessing(false);

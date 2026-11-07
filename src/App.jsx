@@ -6,6 +6,7 @@ import Cart from './pages/Cart';
 import Admin from './pages/Admin';
 import Catalog from './pages/Catalog';
 import About from './pages/About';
+import POS from './pages/POS';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import WhatsAppButton from './components/WhatsAppButton';
@@ -20,6 +21,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/pos" element={<POS />} />
               <Route path="/catalog" element={<Catalog />} />
               <Route path="/nosotros" element={<About />} />
               <Route path="/login" element={<Login />} />

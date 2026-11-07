@@ -47,23 +47,26 @@ const Navbar = () => {
           </Link>
         </div>
         
+        {/* Enlaces de la Tienda Web (Los clientes normales SOLO ven esto) */}
         <div className="nav-links desktop-only">
           <Link to="/" className="nav-link">INICIO</Link>
           <Link to="/catalog" className="nav-link">CATÁLOGO</Link>
           <Link to="/nosotros" className="nav-link">NOSOTROS</Link>
           {isAdmin && (
-            <Link to="/admin" className="nav-link text-accent" style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>
-              ADMIN
+            <Link to="/admin" className="nav-link text-accent" style={{ fontWeight: 'bold', color: '#38bdf8' }}>
+              ⚙️ REGISTRAR PRENDAS
             </Link>
           )}
         </div>
 
         <div className="nav-right">
+          {/* Si es Admin en celular, acceso directo al panel de registro */}
           {isAdmin && (
-            <Link to="/admin" className="icon-btn mobile-only" title="Administración">
-              <Settings size={24} />
+            <Link to="/admin" className="icon-btn mobile-only" title="Registrar Prendas">
+              <Settings size={22} color="#38bdf8" />
             </Link>
           )}
+
           {currentUser ? (
             <button onClick={logout} className="icon-btn" style={{background: 'none', border: 'none', cursor: 'pointer'}} title="Cerrar Sesión">
               <LogOut size={24} />
@@ -73,6 +76,7 @@ const Navbar = () => {
               <User size={24} />
             </Link>
           )}
+
           <Link to="/cart" className="icon-btn cart-btn">
             <ShoppingBag size={24} />
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
