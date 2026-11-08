@@ -201,6 +201,11 @@ h1, h2, h3, h4, h5, h6 {
 /* ===================================================
    REGLAS GLOBALES DE IMPRESIÓN (TICKETS Y ETIQUETAS)
    =================================================== */
+@page {
+  size: letter portrait;
+  margin: 0mm;
+}
+
 @media screen {
   #batch-print-portal,
   .batch-print-portal {
@@ -209,12 +214,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media print {
+  @page {
+    size: letter portrait;
+    margin: 0mm;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
   /* 1. IMPRESIÓN DE HOJA DE ETIQUETAS EN LOTE */
   body.batch-printing-active {
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -240,7 +257,8 @@ h1, h2, h3, h4, h5, h6 {
   body.batch-printing-active .batch-print-page {
     box-sizing: border-box !important;
     width: 100% !important;
-    margin: 0 !important;
+    max-width: 215mm !important;
+    margin: 0 auto !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

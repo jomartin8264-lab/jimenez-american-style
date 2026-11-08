@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { Printer, X, CheckSquare, Square } from 'lucide-react';
 
-function BarcodeSVG({ code, height = 20, width = 1.3 }) {
+function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   const svgRef = useRef(null);
   useEffect(() => {
     if (svgRef.current && code) {
@@ -28,6 +28,7 @@ function BarcodeSVG({ code, height = 20, width = 1.3 }) {
       ref={svgRef} 
       style={{ 
         width: '100%', 
+        maxHeight: `${height}px`,
         height: `${height}px`, 
         display: 'block', 
         margin: '0 auto' 
@@ -614,11 +615,13 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gridAutoRows: sheetLayout === '24' ? '28mm' : '23mm',
-                gap: sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm',
+                gridAutoRows: sheetLayout === '24' ? '24mm' : '20mm',
+                gap: sheetLayout === '24' ? '1mm 2mm' : '0.8mm 1.5mm',
                 boxSizing: 'border-box',
-                padding: '4mm 5mm',
+                padding: '4mm 4mm',
                 width: '100%',
+                maxWidth: '215mm',
+                margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',
                 breakInside: 'avoid',
@@ -635,9 +638,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       style={{ 
                         border: 'none', 
                         visibility: 'hidden',
-                        height: sheetLayout === '24' ? '28mm' : '23mm',
-                        minHeight: sheetLayout === '24' ? '28mm' : '23mm',
-                        maxHeight: sheetLayout === '24' ? '28mm' : '23mm',
+                        height: sheetLayout === '24' ? '24mm' : '20mm',
+                        minHeight: sheetLayout === '24' ? '24mm' : '20mm',
+                        maxHeight: sheetLayout === '24' ? '24mm' : '20mm',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -649,7 +652,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     style={{
                       border: '1px solid #111111',
                       borderRadius: '3px',
-                      padding: '1.2mm 1mm',
+                      padding: '1mm 1mm',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -657,40 +660,40 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       boxSizing: 'border-box',
                       overflow: 'hidden',
                       backgroundColor: '#ffffff',
-                      height: sheetLayout === '24' ? '28mm' : '23mm',
-                      minHeight: sheetLayout === '24' ? '28mm' : '23mm',
-                      maxHeight: sheetLayout === '24' ? '28mm' : '23mm',
+                      height: sheetLayout === '24' ? '24mm' : '20mm',
+                      minHeight: sheetLayout === '24' ? '24mm' : '20mm',
+                      maxHeight: sheetLayout === '24' ? '24mm' : '20mm',
                       color: '#000000',
                       pageBreakInside: 'avoid',
                       breakInside: 'avoid'
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '7.5px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
+                      <div style={{ fontSize: '7px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
                         ALINA
                       </div>
                       <div style={{
-                        fontSize: '9px',
+                        fontSize: '8.5px',
                         fontWeight: 'bold',
                         color: '#000000',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         marginTop: '1px',
-                        lineHeight: 1.1
+                        lineHeight: 1
                       }}>
                         {item.name}
                       </div>
                     </div>
 
-                    <div style={{ margin: '0.4mm 0' }}>
-                      <BarcodeSVG code={item.code} height={18} width={1.25} />
-                      <div style={{ fontSize: '8px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
+                    <div style={{ margin: '0.2mm 0' }}>
+                      <BarcodeSVG code={item.code} height={15} width={1.2} />
+                      <div style={{ fontSize: '7.5px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
                         {item.code}
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', lineHeight: 1 }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#000000', lineHeight: 1 }}>
                       ${Number(item.price).toFixed(2)}
                     </div>
                   </div>
