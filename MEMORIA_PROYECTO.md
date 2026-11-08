@@ -130,9 +130,10 @@ Diseñado para eliminar el desperdicio de hojas carta de stickers (Avery / Janel
 * **Flujo Operativo en 2 Fases:**
   - **Fase 1 (Móvil):** El usuario o empleado usa su celular para capturar prendas con la cámara al momento de desempaquetar la mercancía. Se registran nombre, precio, stock y foto. El SKU es 100% automático.
   - **Fase 2 (Computadora):** En la computadora conectada a la impresora estándar, se abre el modal **"🏷️ Imprimir Hoja de Etiquetas"** (disponible en POS y Admin).
-* **Formatos de Hoja Soportados:**
-  - **24 Etiquetas por Hoja (3 columnas x 8 filas):** Dimensiones ideales para ropa (~64 x 33 mm), con espacio para Nombre, Marca ALINA, Código de barras Code128, SKU legible y Precio grande.
-  - **30 Etiquetas por Hoja (3 columnas x 10 filas):** Formato compacto estándar (Avery 5160 / Janel 30).
+* **Formatos de Hoja y Calibración Milimétrica Exacta:**
+  - **24 Etiquetas por Hoja (3 columnas x 8 filas):** Cuadrícula ajustada a `repeat(8, 29mm)` con `gap: 1.5mm 3mm` y padding de hoja de `7mm 6mm`. Altura total de cuadrícula = 256.5 mm (garantizando más de 20 mm de margen de seguridad dentro de los 279.4 mm de la hoja Carta). Código de barras SVG renderizado a `height: 20px`, asegurando que hasta 24 etiquetas quepan rigurosamente en **1 sola hoja de papel** sin desbordar jamás a una segunda hoja.
+  - **30 Etiquetas por Hoja (3 columnas x 10 filas):** Formato compacto estándar (`repeat(10, 23.5mm)` con `gap: 1mm 2.5mm`), calibrado con margen de seguridad.
+  - **CSS `@page` sin márgenes de navegador:** Regla `@page { size: letter portrait; margin: 0; }` que delega el control de márgenes 100% a la cuadrícula CSS, evitando saltos de página accidentales generados por Chrome o Edge.
 * **Multiplicador por Stock (`Copias x Stock`):** Un botón que asigna automáticamente a cada prenda tantas etiquetas como piezas de stock tenga registrado (ej. 3 playeras = 3 stickers iguales).
 * **Ahorro de Hojas Empezadas (`¿Hoja empezada? Iniciar en posición #X`):** Permite indicar desde qué celda empezar a imprimir (ej. iniciar en la etiqueta #5), dejando vacíos los espacios de stickers ya gastados anteriormente para no tirar ninguna hoja incompleta.
 * **Impresión Directa (`window.print` con `@media print`):** Formateada a tamaño carta (`@page { size: letter portrait }`) para que coincida exactamente con los troqueles adhesivos comerciales.

@@ -3,15 +3,15 @@ import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { Printer, X, CheckSquare, Square } from 'lucide-react';
 
-function BarcodeSVG({ code }) {
+function BarcodeSVG({ code, height = 20, width = 1.3 }) {
   const svgRef = useRef(null);
   useEffect(() => {
     if (svgRef.current && code) {
       try {
         JsBarcode(svgRef.current, String(code), {
           format: "CODE128",
-          width: 1.5,
-          height: 32,
+          width: width,
+          height: height,
           displayValue: false,
           margin: 0,
           background: "transparent",
@@ -21,14 +21,14 @@ function BarcodeSVG({ code }) {
         console.error("Error Barcode:", e);
       }
     }
-  }, [code]);
+  }, [code, height, width]);
 
   return (
     <svg 
       ref={svgRef} 
       style={{ 
         width: '100%', 
-        height: '32px', 
+        height: `${height}px`, 
         display: 'block', 
         margin: '0 auto' 
       }} 
@@ -526,7 +526,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: sheetLayout === '24' ? '5mm 4mm' : '3mm 3mm'
+                      gap: sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm'
                     }}>
                       {pageLabels.map((item, idx) => {
                         if (item.isBlank) {
@@ -535,7 +535,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                               key={item.key} 
                               style={{
                                 border: '1px dashed #e2e8f0',
-                                height: sheetLayout === '24' ? '30mm' : '24mm',
+                                height: sheetLayout === '24' ? '29mm' : '23.5mm',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -554,8 +554,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                             style={{
                               border: '1px solid #e2e8f0',
                               borderRadius: '4px',
-                              padding: '2.5mm 2mm',
-                              height: sheetLayout === '24' ? '30mm' : '24mm',
+                              padding: '1.5mm 1.5mm',
+                              height: sheetLayout === '24' ? '29mm' : '23.5mm',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
@@ -570,7 +570,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                                 ALINA
                               </div>
                               <div style={{
-                                fontSize: '0.72rem',
+                                fontSize: '0.70rem',
                                 fontWeight: 'bold',
                                 color: '#0f172a',
                                 whiteSpace: 'nowrap',
@@ -583,13 +583,13 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                             </div>
 
                             <div style={{ margin: '1px 0' }}>
-                              <BarcodeSVG code={item.code} />
-                              <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: 600, color: '#334155', marginTop: '1px', letterSpacing: '0.5px' }}>
+                              <BarcodeSVG code={item.code} height={20} width={1.3} />
+                              <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 600, color: '#334155', marginTop: '1px', letterSpacing: '0.5px' }}>
                                 {item.code}
                               </div>
                             </div>
 
-                            <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', lineHeight: 1 }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#0f172a', lineHeight: 1 }}>
                               ${Number(item.price).toFixed(2)}
                             </div>
                           </div>
@@ -614,15 +614,19 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gridTemplateRows: sheetLayout === '24' ? 'repeat(8, 31mm)' : 'repeat(10, 24.5mm)',
-                gap: sheetLayout === '24' ? '3mm 4mm' : '2mm 3mm',
+                gridTemplateRows: sheetLayout === '24' ? 'repeat(8, 29mm)' : 'repeat(10, 23.5mm)',
+                gap: sheetLayout === '24' ? '1.5mm 3mm' : '1mm 2.5mm',
                 boxSizing: 'border-box',
-                padding: '8mm 6mm',
+                padding: '7mm 6mm',
                 width: '100%',
-                height: '265mm',
+                height: '276mm',
+                maxHeight: '276mm',
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid',
                 pageBreakAfter: pIdx === pages.length - 1 ? 'avoid' : 'always',
                 breakAfter: pIdx === pages.length - 1 ? 'avoid' : 'page',
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                overflow: 'hidden'
               }}
             >
               {pageLabels.map((item) => {
@@ -640,7 +644,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     style={{
                       border: '1px solid #111111',
                       borderRadius: '4px',
-                      padding: '2.5mm 1.5mm',
+                      padding: '1.5mm 1mm',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -649,15 +653,17 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       overflow: 'hidden',
                       backgroundColor: '#ffffff',
                       height: '100%',
-                      color: '#000000'
+                      color: '#000000',
+                      pageBreakInside: 'avoid',
+                      breakInside: 'avoid'
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '8px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
+                      <div style={{ fontSize: '7.5px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
                         ALINA
                       </div>
                       <div style={{
-                        fontSize: '10px',
+                        fontSize: '9.5px',
                         fontWeight: 'bold',
                         color: '#000000',
                         whiteSpace: 'nowrap',
@@ -670,9 +676,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       </div>
                     </div>
 
-                    <div style={{ margin: '1px 0' }}>
-                      <BarcodeSVG code={item.code} />
-                      <div style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
+                    <div style={{ margin: '0.5mm 0' }}>
+                      <BarcodeSVG code={item.code} height={20} width={1.3} />
+                      <div style={{ fontSize: '8.5px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
                         {item.code}
                       </div>
                     </div>
