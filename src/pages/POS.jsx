@@ -16,6 +16,7 @@ import {
 import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
 import BarcodeModal from '../components/BarcodeModal';
+import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import useSEO from '../hooks/useSEO';
 import './POS.css';
 
@@ -109,6 +110,7 @@ export default function POS() {
 
   // Modal de código de barras
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
 
   // Gestión de Usuarios y Roles (Administradores y Empleados)
   const [userRole, setUserRole] = useState('employee'); // 'admin' | 'employee'
@@ -861,6 +863,26 @@ export default function POS() {
             style={{ background: '#334155', border: 'none', color: soundEnabled ? '#34d399' : '#94a3b8', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer' }}
           >
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+          </button>
+          <button 
+            type="button"
+            onClick={() => setShowBatchModal(true)}
+            style={{ 
+              color: '#34d399', 
+              background: 'rgba(52, 211, 153, 0.15)', 
+              border: '1px solid rgba(52, 211, 153, 0.35)', 
+              fontSize: '0.85rem', 
+              padding: '0.5rem 0.8rem', 
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+            title="Imprimir múltiples etiquetas en hoja tamaño carta"
+          >
+            🏷️ Hoja de Etiquetas
           </button>
           <Link 
             to="/admin" 
@@ -2364,6 +2386,13 @@ export default function POS() {
             </div>
           </div>
         </div>
+      )}
+      {/* MODAL GENERADOR DE HOJA DE ETIQUETAS EN LOTE */}
+      {showBatchModal && (
+        <BatchBarcodeModal 
+          products={products} 
+          onClose={() => setShowBatchModal(false)} 
+        />
       )}
     </div>
   );

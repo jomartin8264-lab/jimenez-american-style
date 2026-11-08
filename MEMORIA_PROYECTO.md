@@ -125,7 +125,19 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
 * **Persistencia de Checklist:** El estado de las prendas empacadas se conserva en `localStorage` (`alina_picked_orders`) para que no se pierda al recargar la app.
 * **SKU en el Ticket Impreso:** Al presionar "Imprimir Ticket", cada partida incluye su SKU impreso para control del repartidor / mandadito.
 
-### F. Modo de Escritorio Local (`Iniciar-POS.bat`)
+### F. Generador de Hojas de Etiquetas Adhesivas en Lote (Flujo en 2 Fases)
+Diseñado para eliminar el desperdicio de hojas carta de stickers (Avery / Janel) y agilizar la operación en tienda:
+* **Flujo Operativo en 2 Fases:**
+  - **Fase 1 (Móvil):** El usuario o empleado usa su celular para capturar prendas con la cámara al momento de desempaquetar la mercancía. Se registran nombre, precio, stock y foto. El SKU es 100% automático.
+  - **Fase 2 (Computadora):** En la computadora conectada a la impresora estándar, se abre el modal **"🏷️ Imprimir Hoja de Etiquetas"** (disponible en POS y Admin).
+* **Formatos de Hoja Soportados:**
+  - **24 Etiquetas por Hoja (3 columnas x 8 filas):** Dimensiones ideales para ropa (~64 x 33 mm), con espacio para Nombre, Marca ALINA, Código de barras Code128, SKU legible y Precio grande.
+  - **30 Etiquetas por Hoja (3 columnas x 10 filas):** Formato compacto estándar (Avery 5160 / Janel 30).
+* **Multiplicador por Stock (`Copias x Stock`):** Un botón que asigna automáticamente a cada prenda tantas etiquetas como piezas de stock tenga registrado (ej. 3 playeras = 3 stickers iguales).
+* **Ahorro de Hojas Empezadas (`¿Hoja empezada? Iniciar en posición #X`):** Permite indicar desde qué celda empezar a imprimir (ej. iniciar en la etiqueta #5), dejando vacíos los espacios de stickers ya gastados anteriormente para no tirar ninguna hoja incompleta.
+* **Impresión Directa (`window.print` con `@media print`):** Formateada a tamaño carta (`@page { size: letter portrait }`) para que coincida exactamente con los troqueles adhesivos comerciales.
+
+### G. Modo de Escritorio Local (`Iniciar-POS.bat`)
 * El encargado de caja solo hace doble clic en `Iniciar-POS.bat`.
 * Levanta `server.cjs` en segundo plano en el puerto `4500`.
 * Abre Google Chrome o Microsoft Edge en modo aplicación (`--app="http://localhost:4500/pos"`), luciendo como una aplicación nativa sin barra de direcciones.
