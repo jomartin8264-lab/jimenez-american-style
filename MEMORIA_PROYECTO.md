@@ -142,4 +142,12 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
 4. **Clientes Frecuentes / Créditos:** Posibilidad de asociar una venta a un cliente registrado o registrar fiados/abonos.
 
 ---
+
+## ⚡ 7. Regla de Oro: Despliegue Continuo (Actualización en la Página en Vivo)
+* **Obligatorio en cada turno:** Cada vez que se realice cualquier modificación, corrección o nueva funcionalidad:
+  1. Ejecutar `npm run build` para compilar la versión de producción sin errores.
+  2. Hacer `git commit` y `git push origin main`.
+  3. Esto activa automáticamente el despliegue en la nube (Vercel), asegurando que tanto las computadoras como los celulares de los administradores y empleados siempre vean la versión más reciente en tiempo real.
+
+---
 *Documento actualizado automáticamente para servir de memoria persistente entre sesiones de trabajo.*
