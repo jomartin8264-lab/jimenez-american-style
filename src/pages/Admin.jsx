@@ -289,7 +289,8 @@ const Admin = () => {
           stock: Number(newProduct.stock),
           createdBy: authorEmail,
           createdByName: authorName,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          labeled: false
         });
         alert(`¡Prenda publicada con éxito!\nCódigo SKU asignado automáticamente: ${productCode}`);
       }

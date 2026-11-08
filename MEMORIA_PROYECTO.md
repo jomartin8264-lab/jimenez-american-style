@@ -130,6 +130,12 @@ Diseñado para eliminar el desperdicio de hojas carta de stickers (Avery / Janel
 * **Flujo Operativo en 2 Fases:**
   - **Fase 1 (Móvil):** El usuario o empleado usa su celular para capturar prendas con la cámara al momento de desempaquetar la mercancía. Se registran nombre, precio, stock y foto. El SKU es 100% automático.
   - **Fase 2 (Computadora):** En la computadora conectada a la impresora estándar, se abre el modal **"🏷️ Imprimir Hoja de Etiquetas"** (disponible en POS y Admin).
+* **Control de Inventario y Bandeja Inteligente de Pendientes:**
+  - **Campo `labeled` en Firestore:** Al crear una prenda nueva desde el celular o computadora, nace automáticamente con `labeled: false`.
+  - **Pestaña por Defecto `⏳ Pendientes`:** Al abrir el generador de etiquetas, solo muestra las prendas recién dadas de alta que aún no han sido etiquetadas, seleccionándolas todas automáticamente para imprimir en 1 clic.
+  - **Pestaña `📦 Todas` y `✓ Listas`:** Permite buscar y reimprimir etiquetas de prendas antiguas del catálogo cuando sea necesario.
+  - **Banner Interactivo Post-Impresión:** Al terminar de imprimir con `window.print()`, aparece un banner interactivo que pregunta: *“¿Se imprimieron bien tus etiquetas? [ ✅ Sí, marcar como etiquetadas ]”*, actualizando Firestore atómicamente con `writeBatch` y limpiando la bandeja de pendientes.
+  - **Marcación Manual y Reversión:** Botón en barra lateral para marcar seleccionadas como etiquetadas o regresarlas a pendientes con 1 solo clic.
 * **Formatos de Hoja y Calibración Milimétrica Exacta:**
   - **24 Etiquetas por Hoja (3 columnas x 8 filas):** Formato ultra-compacto y seguro con `gridAutoRows: 24mm` (gap `1mm 2mm`), padding `4mm 4mm` y `alignContent: 'start'`. Cada etiqueta mide `24mm` de alto con código de barras de `15px` (`width: 1.2`), texto ALINA en `7px`, nombre en `8.5px` y precio en `10px`. 5 filas de etiquetas ocupan solo ~125 mm de alto (menos de la mitad de la hoja Carta de 279.4 mm), garantizando que quepan en 1 sola hoja de papel incluso con márgenes amplios del controlador de impresora.
   - **30 Etiquetas por Hoja (3 columnas x 10 filas):** Formato de `gridAutoRows: 20mm`.

@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
-import { Printer, X, CheckSquare, Square } from 'lucide-react';
+import { db } from '../firebase';
+import { doc, writeBatch } from 'firebase/firestore';
+import { 
+  Printer, X, CheckSquare, Square, CheckCircle2, 
+  Clock, RotateCcw, Sparkles, Check
+} from 'lucide-react';
 
 function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   const svgRef = useRef(null);
@@ -46,6 +51,13 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     };
   }, []);
 
+  // Separar productos por estado de etiquetado
+  const pendingProducts = products.filter(p => !p.labeled);
+  const labeledProducts = products.filter(p => p.labeled === true);
+
+  // Pestaña de filtro activa: 'pending' (solo pendientes), 'all' (todo el catálogo), 'labeled' (ya etiquetadas)
+  const [filterTab, setFilterTab] = useState(() => pendingProducts.length > 0 ? 'pending' : 'all');
+
   // Configuración de cantidades por producto { [productId]: count }
   const [quantities, setQuantities] = useState(() => {
     const init = {};
@@ -56,9 +68,11 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   });
 
   // Cuáles prendas están seleccionadas { [productId]: boolean }
+  // Por defecto selecciona las prendas de la pestaña activa (ej. todas las pendientes)
   const [selectedIds, setSelectedIds] = useState(() => {
     const init = {};
-    products.forEach(p => {
+    const initialList = pendingProducts.length > 0 ? pendingProducts : products;
+    initialList.forEach(p => {
       init[p.id] = true;
     });
     return init;
@@ -73,6 +87,22 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   // Filtro de búsqueda en la lista de selección
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Estados de post-impresión y actualización de Firestore
+  const [showPostPrintPrompt, setShowPostPrintPrompt] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateSuccessMsg, setUpdateSuccessMsg] = useState('');
+
+  // Cambiar pestaña de filtro y auto-seleccionar sus prendas
+  const handleTabChange = (newTab) => {
+    setFilterTab(newTab);
+    const targetList = newTab === 'pending' ? pendingProducts : (newTab === 'labeled' ? labeledProducts : products);
+    const newSelected = {};
+    targetList.forEach(p => {
+      newSelected[p.id] = true;
+    });
+    setSelectedIds(newSelected);
+  };
+
   // Cambiar cantidad de una prenda
   const handleQtyChange = (id, delta) => {
     setQuantities(prev => ({
@@ -86,13 +116,27 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     setSelectedIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Seleccionar todas / deseleccionar todas
-  const handleSelectAll = (select) => {
-    const updated = {};
-    products.forEach(p => {
-      updated[p.id] = select;
+  // Obtener lista según pestaña y término de búsqueda
+  const currentTabProducts = filterTab === 'pending' 
+    ? pendingProducts 
+    : (filterTab === 'labeled' ? labeledProducts : products);
+
+  const filteredProducts = currentTabProducts.filter(p => {
+    const q = searchTerm.toLowerCase();
+    return p.name?.toLowerCase().includes(q) || 
+           p.code?.toLowerCase().includes(q) || 
+           p.sku?.toLowerCase().includes(q);
+  });
+
+  // Seleccionar todas / deseleccionar de la vista actual
+  const handleSelectVisible = (select) => {
+    setSelectedIds(prev => {
+      const updated = { ...prev };
+      filteredProducts.forEach(p => {
+        updated[p.id] = select;
+      });
+      return updated;
     });
-    setSelectedIds(updated);
   };
 
   // Asignar cantidades según el stock actual
@@ -102,6 +146,43 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
       updated[p.id] = Math.max(1, Number(p.stock) || 1);
     });
     setQuantities(updated);
+  };
+
+  // Actualizar en Firestore el estado `labeled` de una lista de IDs
+  const handleMarkAsLabeled = async (idsToMark, status = true) => {
+    if (!idsToMark || idsToMark.length === 0) return;
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(db);
+      idsToMark.forEach(id => {
+        batch.update(doc(db, "products", id), {
+          labeled: status,
+          labeledAt: status ? new Date().toISOString() : null
+        });
+      });
+      await batch.commit();
+
+      setUpdateSuccessMsg(
+        status 
+          ? `✅ ¡${idsToMark.length} prenda(s) marcadas como etiquetadas!`
+          : `↺ ¡${idsToMark.length} prenda(s) regresadas a pendientes!`
+      );
+      setShowPostPrintPrompt(false);
+
+      // Desmarcar de la selección actual
+      setSelectedIds(prev => {
+        const next = { ...prev };
+        idsToMark.forEach(id => { next[id] = false; });
+        return next;
+      });
+
+      setTimeout(() => setUpdateSuccessMsg(''), 4500);
+    } catch (err) {
+      console.error("Error al actualizar etiquetado:", err);
+      alert("Error al actualizar estado en la base de datos: " + (err.message || err));
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   // Construir la lista plana de etiquetas a imprimir
@@ -130,6 +211,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     }
   });
 
+  const selectedProductIds = Object.keys(selectedIds).filter(id => selectedIds[id]);
   const totalLabelsToPrint = flatLabels.filter(l => !l.isBlank).length;
   const labelsPerPage = Number(sheetLayout); // 24 o 30
   
@@ -142,15 +224,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
   const handlePrint = () => {
     window.print();
+    // Abrir banner para preguntar si se desea marcar como etiquetadas
+    setShowPostPrintPrompt(true);
   };
-
-  // Filtrado de lista para el selector
-  const filteredProducts = products.filter(p => {
-    const q = searchTerm.toLowerCase();
-    return p.name?.toLowerCase().includes(q) || 
-           p.code?.toLowerCase().includes(q) || 
-           p.sku?.toLowerCase().includes(q);
-  });
 
   return (
     <>
@@ -176,9 +252,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
           backgroundColor: '#1e293b',
           color: '#f8fafc',
           borderRadius: '16px',
-          maxWidth: '1020px',
+          maxWidth: '1060px',
           width: '100%',
-          maxHeight: '92vh',
+          maxHeight: '94vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
@@ -199,7 +275,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                 <Printer size={22} /> Generador de Hoja de Etiquetas en Lote
               </h2>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
-                Imprime múltiples etiquetas en hojas adhesivas tamaño carta (Avery / Janel) sin desperdiciar papel.
+                Control inteligente de inventario: imprime por lotes y marca tus prendas etiquetadas sin confusiones.
               </p>
             </div>
             <button 
@@ -221,51 +297,142 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
             </button>
           </div>
 
+          {/* Toast / Mensaje de Éxito Flotante */}
+          {updateSuccessMsg && (
+            <div style={{
+              backgroundColor: '#065f46',
+              color: '#a7f3d0',
+              padding: '0.65rem 1.25rem',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              borderBottom: '1px solid #059669'
+            }}>
+              <CheckCircle2 size={18} color="#34d399" />
+              <span>{updateSuccessMsg}</span>
+            </div>
+          )}
+
           {/* Cuerpo del modal dividido en 2 columnas: Configuración y Vista Previa */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '360px 1fr',
+            gridTemplateColumns: '380px 1fr',
             flex: 1,
             overflow: 'hidden'
           }}>
             {/* Panel Izquierdo: Selección y Configuración */}
             <div style={{
-              padding: '1.25rem',
+              padding: '1.1rem',
               borderRight: '1px solid #334155',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem',
+              gap: '0.85rem',
               overflowY: 'auto',
               backgroundColor: '#1e293b'
             }}>
-              {/* 1. Selector de formato de hoja */}
+              {/* PESTAÑAS INTELIGENTES: Pendientes vs Todo el Catálogo */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  1. Formato de Hoja Adhesiva:
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Bandeja de Etiquetas:
                 </label>
-                <select
-                  value={sheetLayout}
-                  onChange={(e) => setSheetLayout(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #475569',
-                    color: '#fff',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  <option value="24">24 Etiquetas por Hoja (3x8) - Formato Ropa Ideal</option>
-                  <option value="30">30 Etiquetas por Hoja (3x10) - Formato Estándar</option>
-                </select>
+                <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#0f172a', padding: '0.3rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('pending')}
+                    style={{
+                      flex: 1.2,
+                      padding: '0.45rem 0.3rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      backgroundColor: filterTab === 'pending' ? '#eab308' : 'transparent',
+                      color: filterTab === 'pending' ? '#000' : '#e2e8f0'
+                    }}
+                  >
+                    <Clock size={13} />
+                    Pendientes ({pendingProducts.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('all')}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.3rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      backgroundColor: filterTab === 'all' ? '#38bdf8' : 'transparent',
+                      color: filterTab === 'all' ? '#000' : '#94a3b8'
+                    }}
+                  >
+                    Todas ({products.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('labeled')}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.3rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      backgroundColor: filterTab === 'labeled' ? '#10b981' : 'transparent',
+                      color: filterTab === 'labeled' ? '#000' : '#94a3b8'
+                    }}
+                  >
+                    Listas ({labeledProducts.length})
+                  </button>
+                </div>
               </div>
 
-              {/* 2. Posición inicial para ahorrar hojas usadas */}
-              <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.08)', padding: '0.75rem', borderRadius: '8px', border: '1px dashed rgba(56, 189, 248, 0.3)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#38bdf8' }}>
-                    2. ¿Hoja empezada? Iniciar en:
+              {/* 1. Selector de formato de hoja */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    Formato de Hoja:
+                  </label>
+                  <select
+                    value={sheetLayout}
+                    onChange={(e) => setSheetLayout(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem',
+                      borderRadius: '6px',
+                      backgroundColor: '#0f172a',
+                      border: '1px solid #475569',
+                      color: '#fff',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    <option value="24">24 (3x8) Ropa</option>
+                    <option value="30">30 (3x10) Compacto</option>
+                  </select>
+                </div>
+
+                {/* 2. Posición inicial para ahorrar hojas usadas */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#38bdf8', marginBottom: '0.25rem' }}>
+                    Iniciar en celda:
                   </label>
                   <input 
                     type="number"
@@ -273,32 +440,31 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     max={sheetLayout}
                     value={startPosition}
                     onChange={(e) => setStartPosition(Math.min(Number(sheetLayout), Math.max(1, Number(e.target.value) || 1)))}
+                    title="Si ya gastaste etiquetas de la hoja, inicia en esta posición"
                     style={{
-                      width: '60px',
-                      padding: '0.35rem',
+                      width: '100%',
+                      padding: '0.45rem',
                       textAlign: 'center',
                       backgroundColor: '#0f172a',
                       border: '1px solid #38bdf8',
                       color: '#38bdf8',
                       fontWeight: 'bold',
-                      borderRadius: '4px'
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
                     }}
                   />
                 </div>
-                <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem', marginTop: '0.3rem' }}>
-                  Si ya usaste las primeras {startPosition - 1} etiquetas de tu hoja, el sistema dejará esos espacios en blanco.
-                </small>
               </div>
 
-              {/* 3. Selección rápida de cantidades */}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {/* 3. Botones de acción rápida sobre selección */}
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
                 <button
                   type="button"
-                  onClick={() => handleSelectAll(true)}
+                  onClick={() => handleSelectVisible(true)}
                   style={{
                     flex: 1,
-                    padding: '0.4rem',
-                    fontSize: '0.75rem',
+                    padding: '0.35rem',
+                    fontSize: '0.72rem',
                     backgroundColor: '#334155',
                     border: 'none',
                     color: '#cbd5e1',
@@ -306,15 +472,15 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     cursor: 'pointer'
                   }}
                 >
-                  Todas
+                  Visibles
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSelectAll(false)}
+                  onClick={() => handleSelectVisible(false)}
                   style={{
                     flex: 1,
-                    padding: '0.4rem',
-                    fontSize: '0.75rem',
+                    padding: '0.35rem',
+                    fontSize: '0.72rem',
                     backgroundColor: '#334155',
                     border: 'none',
                     color: '#cbd5e1',
@@ -330,8 +496,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   title="Poner la cantidad de etiquetas igual al stock de cada prenda"
                   style={{
                     flex: 1.2,
-                    padding: '0.4rem',
-                    fontSize: '0.75rem',
+                    padding: '0.35rem',
+                    fontSize: '0.72rem',
                     backgroundColor: 'rgba(52, 211, 153, 0.15)',
                     border: '1px solid rgba(52, 211, 153, 0.4)',
                     color: '#34d399',
@@ -347,7 +513,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               {/* Buscador de prendas */}
               <input 
                 type="text"
-                placeholder="Buscar prenda o código..."
+                placeholder="Buscar por nombre o SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -368,93 +534,177 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                 border: '1px solid #334155',
                 borderRadius: '8px',
                 backgroundColor: '#0f172a',
-                maxHeight: '320px'
+                maxHeight: '260px'
               }}>
-                {filteredProducts.map(p => {
-                  const isSelected = !!selectedIds[p.id];
-                  const qty = quantities[p.id] || 1;
-                  return (
-                    <div 
-                      key={p.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.5rem 0.65rem',
-                        borderBottom: '1px solid #1e293b',
-                        backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.06)' : 'transparent',
-                        gap: '0.5rem'
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSelect(p.id)}
+                {filteredProducts.length === 0 ? (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
+                    {filterTab === 'pending' 
+                      ? '🎉 ¡No hay prendas pendientes de etiquetar!'
+                      : 'No se encontraron prendas con ese filtro.'}
+                  </div>
+                ) : (
+                  filteredProducts.map(p => {
+                    const isSelected = !!selectedIds[p.id];
+                    const qty = quantities[p.id] || 1;
+                    const isItemLabeled = p.labeled === true;
+
+                    return (
+                      <div 
+                        key={p.id}
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: isSelected ? '#38bdf8' : '#64748b',
-                          padding: 0
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0.45rem 0.6rem',
+                          borderBottom: '1px solid #1e293b',
+                          backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                          gap: '0.5rem'
                         }}
                       >
-                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                      </button>
-                      
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.name}
+                        <button
+                          type="button"
+                          onClick={() => toggleSelect(p.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: isSelected ? '#38bdf8' : '#64748b',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          {isSelected ? <CheckSquare size={17} /> : <Square size={17} />}
+                        </button>
+                        
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.name}
+                            </span>
+                            {isItemLabeled ? (
+                              <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontSize: '0.62rem', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                ✓ Lista
+                              </span>
+                            ) : (
+                              <span style={{ backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#facc15', fontSize: '0.62rem', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                ⏳ Pendiente
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '1px' }}>
+                            ${p.price} | Stock: {p.stock} | <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{p.code || p.sku || 'S/C'}</span>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                          ${p.price} | Stock: {p.stock} | <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{p.code || p.sku || 'S/C'}</span>
-                        </div>
-                      </div>
 
-                      {/* Selector de copias */}
-                      {isSelected && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleQtyChange(p.id, -1)}
-                            style={{
-                              width: '22px',
-                              height: '22px',
-                              borderRadius: '4px',
-                              backgroundColor: '#334155',
-                              border: 'none',
-                              color: '#fff',
-                              cursor: 'pointer',
-                              fontSize: '0.8rem'
-                            }}
-                          >
-                            -
-                          </button>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 'bold', width: '22px', textAlign: 'center' }}>
-                            {qty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQtyChange(p.id, 1)}
-                            style={{
-                              width: '22px',
-                              height: '22px',
-                              borderRadius: '4px',
-                              backgroundColor: '#334155',
-                              border: 'none',
-                              color: '#fff',
-                              cursor: 'pointer',
-                              fontSize: '0.8rem'
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {/* Selector de copias */}
+                        {isSelected && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(p.id, -1)}
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '4px',
+                                border: '1px solid #475569',
+                                backgroundColor: '#1e293b',
+                                color: '#cbd5e1',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              -
+                            </button>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', width: '18px', textAlign: 'center', color: '#38bdf8' }}>
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(p.id, 1)}
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '4px',
+                                border: '1px solid #475569',
+                                backgroundColor: '#1e293b',
+                                color: '#cbd5e1',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
+
+              {/* Botón de marcación manual directa */}
+              {selectedProductIds.length > 0 && (
+                <div style={{ marginTop: 'auto', paddingTop: '0.4rem', borderTop: '1px solid #334155' }}>
+                  {filterTab === 'labeled' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleMarkAsLabeled(selectedProductIds, false)}
+                      disabled={isUpdating}
+                      style={{
+                        width: '100%',
+                        padding: '0.55rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                        border: '1px solid rgba(234, 179, 8, 0.4)',
+                        color: '#facc15',
+                        borderRadius: '6px',
+                        cursor: isUpdating ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <RotateCcw size={14} />
+                      {isUpdating ? 'Actualizando...' : `Regresar ${selectedProductIds.length} a Pendientes`}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleMarkAsLabeled(selectedProductIds, true)}
+                      disabled={isUpdating}
+                      style={{
+                        width: '100%',
+                        padding: '0.55rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        color: '#34d399',
+                        borderRadius: '6px',
+                        cursor: isUpdating ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <CheckCircle2 size={14} />
+                      {isUpdating ? 'Guardando...' : `Marcar ${selectedProductIds.length} como ya Etiquetadas`}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Panel Derecho: Vista previa de la hoja de etiquetas */}
+            {/* Panel Derecho: Vista previa e Impresión */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -495,6 +745,70 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   <Printer size={16} /> Imprimir Hoja ({totalPages} pág)
                 </button>
               </div>
+
+              {/* Banner Interactivo Post-Impresión */}
+              {showPostPrintPrompt && selectedProductIds.length > 0 && (
+                <div style={{
+                  backgroundColor: '#064e3b',
+                  borderBottom: '2px solid #10b981',
+                  padding: '0.85rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Sparkles size={22} color="#34d399" />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#fff' }}>
+                        ¿Se imprimieron bien tus etiquetas?
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#a7f3d0' }}>
+                        Marca las {selectedProductIds.length} prenda(s) para sacarlas automáticamente de tu bandeja de pendientes.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleMarkAsLabeled(selectedProductIds, true)}
+                      disabled={isUpdating}
+                      style={{
+                        backgroundColor: '#10b981',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: isUpdating ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <Check size={15} />
+                      {isUpdating ? 'Guardando...' : 'Sí, marcar como etiquetadas'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPostPrintPrompt(false)}
+                      style={{
+                        backgroundColor: 'transparent',
+                        color: '#94a3b8',
+                        border: '1px solid #065f46',
+                        borderRadius: '6px',
+                        padding: '0.45rem 0.75rem',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Dejar pendientes
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Vista previa en pantalla */}
               <div style={{
@@ -584,7 +898,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                             </div>
 
                             <div style={{ margin: '1px 0' }}>
-                              <BarcodeSVG code={item.code} height={20} width={1.3} />
+                              <BarcodeSVG code={item.code} height={15} width={1.2} />
                               <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 600, color: '#334155', marginTop: '1px', letterSpacing: '0.5px' }}>
                                 {item.code}
                               </div>
