@@ -28,13 +28,25 @@ const server = http.createServer((req, res) => {
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const headers = { 'Content-Type': contentType };
+    if (ext === '.html') {
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+      headers['Expires'] = '0';
+    }
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   } else {
     // SPA Fallback para React Router
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       fs.createReadStream(indexPath).pipe(res);
     } else {
       res.writeHead(404);
