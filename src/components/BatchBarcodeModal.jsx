@@ -10,8 +10,8 @@ function BarcodeSVG({ code }) {
       try {
         JsBarcode(svgRef.current, String(code), {
           format: "CODE128",
-          width: 1.4,
-          height: 28,
+          width: 1.5,
+          height: 32,
           displayValue: false,
           margin: 0,
           background: "transparent",
@@ -23,10 +23,28 @@ function BarcodeSVG({ code }) {
     }
   }, [code]);
 
-  return <svg ref={svgRef} style={{ maxWidth: '100%', height: '28px', display: 'block', margin: '0 auto' }} />;
+  return (
+    <svg 
+      ref={svgRef} 
+      style={{ 
+        width: '100%', 
+        height: '32px', 
+        display: 'block', 
+        margin: '0 auto' 
+      }} 
+    />
+  );
 }
 
 export default function BatchBarcodeModal({ products = [], onClose }) {
+  // Conectar clase especial al body para aislar la hoja en la impresion
+  useEffect(() => {
+    document.body.classList.add('batch-printing-active');
+    return () => {
+      document.body.classList.remove('batch-printing-active');
+    };
+  }, []);
+
   // Configuración de cantidades por producto { [productId]: count }
   const [quantities, setQuantities] = useState(() => {
     const init = {};
@@ -620,7 +638,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   <div 
                     key={item.key}
                     style={{
-                      border: '1px solid #d1d5db',
+                      border: '1px solid #111111',
                       borderRadius: '4px',
                       padding: '2.5mm 1.5mm',
                       display: 'flex',
@@ -630,11 +648,12 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       boxSizing: 'border-box',
                       overflow: 'hidden',
                       backgroundColor: '#ffffff',
-                      height: '100%'
+                      height: '100%',
+                      color: '#000000'
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
+                      <div style={{ fontSize: '8px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
                         ALINA
                       </div>
                       <div style={{
@@ -653,7 +672,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
                     <div style={{ margin: '1px 0' }}>
                       <BarcodeSVG code={item.code} />
-                      <div style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 600, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
+                      <div style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
                         {item.code}
                       </div>
                     </div>
@@ -669,50 +688,6 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
         </div>,
         document.body
       )}
-
-      {/* ESTILOS DE IMPRESIÓN CON AISLAMIENTO TOTAL */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media screen {
-          .batch-print-portal {
-            display: none !important;
-          }
-        }
-        @media print {
-          /* 1. Ocultar absolutamente todo el DOM de la aplicación (evita hojas vacías sobrantes) */
-          body > *:not(#batch-print-portal) {
-            display: none !important;
-          }
-          
-          /* 2. Mostrar únicamente el portal de impresión */
-          body > #batch-print-portal {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-          }
-
-          html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-            height: auto !important;
-            overflow: visible !important;
-          }
-
-          .batch-print-page {
-            box-sizing: border-box !important;
-          }
-
-          @page {
-            size: letter portrait;
-            margin: 4mm 3mm;
-          }
-        }
-      ` }} />
     </>
   );
 }

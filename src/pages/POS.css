@@ -853,34 +853,4 @@
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
-/* REGLAS PARA IMPRESIÓN */
-@media print {
-  body * {
-    visibility: hidden;
-  }
-  #printable-ticket, #printable-ticket * {
-    visibility: visible;
-  }
-  #printable-ticket {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 78mm;
-    color: #000 !important;
-    background: #fff !important;
-    padding: 3mm 4mm;
-    box-shadow: none !important;
-    border: none !important;
-  }
-  #printable-barcode-tag, #printable-barcode-tag * {
-    visibility: visible;
-  }
-  #printable-barcode-tag {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 60mm;
-    color: #000;
-    background: #fff;
-  }
-}
+

@@ -196,3 +196,89 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
   border-color: var(--color-secondary);
 }
+
+
+/* ===================================================
+   REGLAS GLOBALES DE IMPRESIÓN (TICKETS Y ETIQUETAS)
+   =================================================== */
+@media screen {
+  #batch-print-portal,
+  .batch-print-portal {
+    display: none !important;
+  }
+}
+
+@media print {
+  /* 1. IMPRESIÓN DE HOJA DE ETIQUETAS EN LOTE */
+  body.batch-printing-active {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.batch-printing-active > #root,
+  body.batch-printing-active > .batch-modal-screen-wrap {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.batch-printing-active #batch-print-portal,
+  body.batch-printing-active .batch-print-portal {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.batch-printing-active #batch-print-portal * {
+    visibility: visible !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 2. IMPRESIÓN DE TICKET O ETIQUETA INDIVIDUAL */
+  body:not(.batch-printing-active) * {
+    visibility: hidden;
+  }
+
+  body:not(.batch-printing-active) #printable-ticket,
+  body:not(.batch-printing-active) #printable-ticket *,
+  body:not(.batch-printing-active) #printable-barcode-tag,
+  body:not(.batch-printing-active) #printable-barcode-tag * {
+    visibility: visible !important;
+  }
+
+  body:not(.batch-printing-active) #printable-ticket {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 78mm;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 3mm 4mm;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  body:not(.batch-printing-active) #printable-barcode-tag {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 60mm;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  @page {
+    size: letter portrait;
+    margin: 4mm 3mm;
+  }
+}
