@@ -617,16 +617,14 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                 gridTemplateRows: sheetLayout === '24' ? 'repeat(8, 29mm)' : 'repeat(10, 23.5mm)',
                 gap: sheetLayout === '24' ? '1.5mm 3mm' : '1mm 2.5mm',
                 boxSizing: 'border-box',
-                padding: '7mm 6mm',
+                padding: '6mm 6mm',
                 width: '100%',
-                height: '276mm',
-                maxHeight: '276mm',
+                alignContent: 'start',
                 pageBreakInside: 'avoid',
                 breakInside: 'avoid',
                 pageBreakAfter: pIdx === pages.length - 1 ? 'avoid' : 'always',
                 breakAfter: pIdx === pages.length - 1 ? 'avoid' : 'page',
-                backgroundColor: '#ffffff',
-                overflow: 'hidden'
+                backgroundColor: '#ffffff'
               }}
             >
               {pageLabels.map((item) => {
@@ -634,7 +632,14 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   return (
                     <div 
                       key={item.key} 
-                      style={{ border: 'none', visibility: 'hidden' }}
+                      style={{ 
+                        border: 'none', 
+                        visibility: 'hidden',
+                        height: sheetLayout === '24' ? '29mm' : '23.5mm',
+                        minHeight: sheetLayout === '24' ? '29mm' : '23.5mm',
+                        maxHeight: sheetLayout === '24' ? '29mm' : '23.5mm',
+                        boxSizing: 'border-box'
+                      }}
                     />
                   );
                 }
@@ -652,7 +657,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       boxSizing: 'border-box',
                       overflow: 'hidden',
                       backgroundColor: '#ffffff',
-                      height: '100%',
+                      height: sheetLayout === '24' ? '29mm' : '23.5mm',
+                      minHeight: sheetLayout === '24' ? '29mm' : '23.5mm',
+                      maxHeight: sheetLayout === '24' ? '29mm' : '23.5mm',
                       color: '#000000',
                       pageBreakInside: 'avoid',
                       breakInside: 'avoid'

@@ -237,6 +237,14 @@ h1, h2, h3, h4, h5, h6 {
     background: #ffffff !important;
   }
 
+  body.batch-printing-active .batch-print-page {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   body.batch-printing-active #batch-print-portal * {
     visibility: visible !important;
     color: #000000 !important;
