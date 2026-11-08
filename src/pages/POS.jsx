@@ -1468,57 +1468,99 @@ export default function POS() {
                         onClick={() => openReceiptModal(order)}
                         className="pos-btn-print-order"
                         title="Imprimir ticket para anexar al paquete o entrega"
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          padding: '0.6rem 0.5rem',
+                          fontSize: '0.82rem',
+                          margin: 0
+                        }}
                       >
                         <Printer size={15} /> Imprimir Ticket
                       </button>
 
-                      {cleanPhone && (
+                      {cleanPhone ? (
                         <a 
                           href={waUrl} 
                           target="_blank" 
                           rel="noreferrer" 
                           className="pos-wa-btn"
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem',
+                            padding: '0.6rem 0.5rem',
+                            fontSize: '0.82rem',
+                            margin: 0
+                          }}
                         >
-                          <MessageSquare size={16} /> Contactar WhatsApp
+                          <MessageSquare size={15} /> WhatsApp
                         </a>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          color: '#64748b',
+                          background: '#1e293b',
+                          borderRadius: '6px',
+                          border: '1px solid #334155'
+                        }}>
+                          Sin teléfono
+                        </div>
                       )}
+
                       <select 
                         value={order.status || 'pendiente'}
                         onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
                         style={{
+                          width: '100%',
                           background: '#334155',
                           border: '1px solid #475569',
                           color: '#fff',
                           borderRadius: '6px',
-                          padding: '0.5rem',
-                          fontSize: '0.85rem'
+                          padding: '0.55rem 0.5rem',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer'
                         }}
                       >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="en_camino">En preparación / En camino</option>
-                        <option value="entregado">Entregado</option>
-                        <option value="cancelado">Cancelado</option>
+                        <option value="pendiente">⏳ Pendiente</option>
+                        <option value="en_camino">🚚 En camino</option>
+                        <option value="entregado">✅ Entregado</option>
+                        <option value="cancelado">❌ Cancelado</option>
                       </select>
 
-                      {isAdmin && (
+                      {isAdmin ? (
                         <button 
                           onClick={() => handleDeleteWebOrder(order)}
                           style={{
+                            width: '100%',
                             background: 'rgba(239, 68, 68, 0.15)',
                             border: '1px solid rgba(239, 68, 68, 0.35)',
                             color: '#ef4444',
                             borderRadius: '6px',
-                            padding: '0.45rem 0.65rem',
-                            fontSize: '0.8rem',
+                            padding: '0.55rem 0.5rem',
+                            fontSize: '0.82rem',
                             cursor: 'pointer',
-                            display: 'inline-flex',
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: '0.25rem'
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            fontWeight: 600,
+                            transition: 'all 0.15s ease'
                           }}
                           title="Eliminar pedido web permanentemente (Solo Administrador)"
                         >
-                          <Trash2 size={13} /> Borrar
+                          <Trash2 size={14} /> Borrar
                         </button>
+                      ) : (
+                        <div />
                       )}
                     </div>
                   </div>
