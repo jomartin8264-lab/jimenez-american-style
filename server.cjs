@@ -24,17 +24,19 @@ const server = http.createServer((req, res) => {
   let reqPath = decodeURI(req.url.split('?')[0]);
   if (reqPath === '/') reqPath = '/index.html';
 
+  console.log(`${new Date().toLocaleTimeString()} - ${req.method} ${reqPath}`);
+
   let filePath = path.join(distPath, reqPath);
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    const headers = { 'Content-Type': contentType };
-    if (ext === '.html') {
-      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-      headers['Pragma'] = 'no-cache';
-      headers['Expires'] = '0';
-    }
+    const headers = { 
+      'Content-Type': contentType,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
     res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   } else {
