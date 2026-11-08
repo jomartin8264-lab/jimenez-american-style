@@ -117,7 +117,15 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
 * Carrito de compras reactivo con persistencia en `localStorage`.
 * Pedido estructurado exportable a mensaje directo de WhatsApp.
 
-### C. Modo de Escritorio Local (`Iniciar-POS.bat`)
+### E. Asistente de Surtido y Empaque para Pedidos Web (Picking & Packing)
+* **Miniaturas con Foto:** En cada tarjeta de pedido web, cada artículo muestra la fotografía real de la prenda. Al hacer clic o tocar la foto, se abre un modal de alta resolución para ver el diseño, color y detalles exactos de la prenda que se debe tomar del perchero.
+* **SKU / Código en la Tarjeta:** Muestra la insignia `SKU: ALN-XXXX` para cotejar directamente con la etiqueta física de la prenda en la tienda.
+* **Checklist Interactivo de Surtido:** Casilla de verificación `[ ]` junto a cada prenda. Al tomarla del perchero y meterla en la bolsa, el usuario la marca `[✓] Surtido`, cambiando la línea a verde y tachando el nombre.
+* **Barra de Progreso:** Indica `📦 Surtido: X de Y prendas listas` o `🎉 ¡Pedido 100% surtido en bolsa!`.
+* **Persistencia de Checklist:** El estado de las prendas empacadas se conserva en `localStorage` (`alina_picked_orders`) para que no se pierda al recargar la app.
+* **SKU en el Ticket Impreso:** Al presionar "Imprimir Ticket", cada partida incluye su SKU impreso para control del repartidor / mandadito.
+
+### F. Modo de Escritorio Local (`Iniciar-POS.bat`)
 * El encargado de caja solo hace doble clic en `Iniciar-POS.bat`.
 * Levanta `server.cjs` en segundo plano en el puerto `4500`.
 * Abre Google Chrome o Microsoft Edge en modo aplicación (`--app="http://localhost:4500/pos"`), luciendo como una aplicación nativa sin barra de direcciones.

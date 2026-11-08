@@ -104,7 +104,8 @@ const Cart = () => {
             name: item.name,
             price: Number(item.price),
             quantity: Number(item.quantity),
-            code: item.code || '',
+            code: item.code || item.sku || '',
+            sku: item.sku || item.code || '',
             image: item.image || ''
           })),
           total: Number(cartTotal),

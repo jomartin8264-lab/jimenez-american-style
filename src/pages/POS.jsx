@@ -84,6 +84,29 @@ export default function POS() {
   const knownOrderIds = useRef(new Set());
   const initialLoadDone = useRef(false);
 
+  // Surtido y Empaque de Pedidos Web (Checklist y Fotos)
+  const [pickedMap, setPickedMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alina_picked_orders');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+  const [previewImage, setPreviewImage] = useState(null);
+
+  const toggleItemPicked = (orderId, itemId) => {
+    const key = `${orderId}_${itemId}`;
+    setPickedMap(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('alina_picked_orders', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+    if (soundEnabled) soundAlert('beep');
+  };
+
   // Modal de código de barras
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState(null);
 
@@ -1277,14 +1300,161 @@ export default function POS() {
                       </div>
                     </div>
 
-                    {/* Lista de prendas */}
-                    <div className="pos-order-items-box">
-                      {(order.items || []).map((it, idx) => (
-                        <div key={idx} className="pos-order-item-line">
-                          <span>{it.quantity}x {it.name}</span>
-                          <span style={{ fontWeight: 600 }}>${(it.price * it.quantity).toFixed(2)}</span>
+                    {/* Barra de progreso de Surtido / Empaque */}
+                    {(() => {
+                      const totalItemsCount = (order.items || []).length;
+                      const pickedCount = (order.items || []).filter((item, i) => pickedMap[`${order.id}_${item.id || i}`]).length;
+                      const isOrderFullyPicked = totalItemsCount > 0 && pickedCount === totalItemsCount;
+                      return (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.45rem 0.65rem',
+                          borderRadius: '6px',
+                          backgroundColor: isOrderFullyPicked ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.12)',
+                          border: `1px solid ${isOrderFullyPicked ? 'rgba(52, 211, 153, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+                          fontSize: '0.78rem',
+                          fontWeight: 600
+                        }}>
+                          <span style={{ color: isOrderFullyPicked ? '#34d399' : '#f59e0b' }}>
+                            {isOrderFullyPicked ? '🎉 ¡Pedido 100% surtido en bolsa!' : `📦 Surtido: ${pickedCount} de ${totalItemsCount} prendas listas`}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                            Toca la casilla para marcar
+                          </span>
                         </div>
-                      ))}
+                      );
+                    })()}
+
+                    {/* Lista de prendas con Foto, SKU y Checkbox */}
+                    <div className="pos-order-items-box" style={{ gap: '0.55rem', maxHeight: '240px' }}>
+                      {(order.items || []).map((it, idx) => {
+                        const productMatch = products.find(p => p.id === it.id);
+                        const itemImg = it.image || productMatch?.image;
+                        const itemSku = it.code || it.sku || productMatch?.code || productMatch?.sku;
+                        const itemKey = `${order.id}_${it.id || idx}`;
+                        const isPicked = !!pickedMap[itemKey];
+
+                        return (
+                          <div 
+                            key={idx} 
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.5rem',
+                              borderRadius: '8px',
+                              backgroundColor: isPicked ? 'rgba(52, 211, 153, 0.08)' : 'rgba(30, 41, 59, 0.6)',
+                              border: `1px solid ${isPicked ? 'rgba(52, 211, 153, 0.35)' : 'rgba(51, 65, 85, 0.6)'}`,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {/* Casilla de verificación de surtido */}
+                            <button
+                              type="button"
+                              onClick={() => toggleItemPicked(order.id, it.id || idx)}
+                              title={isPicked ? "Prenda surtida (clic para desmarcar)" : "Clic para marcar como surtida/en bolsa"}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                border: `2px solid ${isPicked ? '#34d399' : '#64748b'}`,
+                                backgroundColor: isPicked ? '#34d399' : 'transparent',
+                                color: isPicked ? '#0f172a' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                padding: 0,
+                                fontSize: '0.9rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {isPicked ? '✓' : ''}
+                            </button>
+
+                            {/* Miniatura de la foto con ampliación al tocar */}
+                            {itemImg ? (
+                              <img 
+                                src={itemImg} 
+                                alt={it.name}
+                                onClick={() => setPreviewImage({ url: itemImg, name: it.name, sku: itemSku, price: it.price })}
+                                title="Toca para ver la foto en grande"
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  objectFit: 'cover',
+                                  borderRadius: '6px',
+                                  border: '1px solid #475569',
+                                  cursor: 'zoom-in',
+                                  flexShrink: 0
+                                }}
+                                onError={(e) => { e.target.onerror = null; e.target.src = '/images/brand_logo_1774572391476.png'; }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '6px',
+                                backgroundColor: '#334155',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.3rem',
+                                flexShrink: 0
+                              }}>
+                                👗
+                              </div>
+                            )}
+
+                            {/* Datos de la prenda */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontSize: '0.86rem',
+                                fontWeight: 600,
+                                color: isPicked ? '#94a3b8' : '#f8fafc',
+                                textDecoration: isPicked ? 'line-through' : 'none',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {it.quantity > 1 && <span style={{ color: '#38bdf8', marginRight: '4px' }}>{it.quantity}x</span>}
+                                {it.name}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '3px', flexWrap: 'wrap' }}>
+                                {itemSku && (
+                                  <span style={{
+                                    fontSize: '0.72rem',
+                                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                                    color: '#38bdf8',
+                                    padding: '0.1rem 0.45rem',
+                                    borderRadius: '4px',
+                                    fontFamily: 'monospace',
+                                    fontWeight: 700
+                                  }}>
+                                    SKU: {itemSku}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  ${Number(it.price).toFixed(2)} c/u
+                                </span>
+                                {isPicked && (
+                                  <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>
+                                    ✓ En bolsa
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Subtotal */}
+                            <div style={{ textAlign: 'right', flexShrink: 0, fontWeight: 700, fontSize: '0.9rem', color: isPicked ? '#34d399' : '#f8fafc' }}>
+                              ${(it.price * it.quantity).toFixed(2)}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="pos-order-total-bar">
@@ -1863,9 +2033,14 @@ export default function POS() {
               {/* Desglose de artículos */}
               <div style={{ fontSize: '0.8rem' }}>
                 {(lastReceipt.items || []).map((it, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                     <span style={{ maxWidth: '72%', wordBreak: 'break-word' }}>
-                      {it.quantity}x {it.name}
+                      <strong>{it.quantity}x {it.name}</strong>
+                      {(it.code || it.sku) && (
+                        <div style={{ fontSize: '0.68rem', color: '#555', fontFamily: 'monospace' }}>
+                          SKU: {it.code || it.sku}
+                        </div>
+                      )}
                     </span>
                     <span style={{ fontWeight: 600 }}>${(it.price * it.quantity).toFixed(2)}</span>
                   </div>
@@ -2059,6 +2234,94 @@ export default function POS() {
           product={selectedBarcodeProduct} 
           onClose={() => setSelectedBarcodeProduct(null)} 
         />
+      )}
+
+      {/* MODAL DE VISTA PREVIA DE FOTO EN GRANDE (PARA SURTIDO DE PEDIDOS) */}
+      {previewImage && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999999,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div 
+            style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid #475569',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '1.25rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+              color: '#f8fafc',
+              position: 'relative',
+              textAlign: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+              <div style={{ textAlign: 'left' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#38bdf8' }}>{previewImage.name}</h3>
+                {previewImage.sku && (
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>
+                    SKU: {previewImage.sku}
+                  </span>
+                )}
+              </div>
+              <button 
+                onClick={() => setPreviewImage(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: '#fff',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              backgroundColor: '#0f172a',
+              maxHeight: '420px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '1rem'
+            }}>
+              <img 
+                src={previewImage.url} 
+                alt={previewImage.name}
+                style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.6rem', borderTop: '1px solid #334155' }}>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Precio en catálogo:</span>
+              <strong style={{ fontSize: '1.25rem', color: '#34d399' }}>${Number(previewImage.price || 0).toFixed(2)} MXN</strong>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
