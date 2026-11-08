@@ -3,25 +3,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Función auxiliar para saber si el usuario es Administrador
+    // Función auxiliar para saber si el usuario es Administrador con acceso total
     function isAdmin() {
       return request.auth != null && 
              get(/databases/$(database)/documents/config/admins).data.emails.hasAny([request.auth.token.email]);
     }
 
-    // PRODUCTOS: Todos pueden ver. Admins gestionan todo y clientes registrados pueden descontar existencias al comprar
+    // PRODUCTOS: Todos pueden ver. Personal autorizado crea/actualiza; SOLO Administradores pueden eliminar prendas
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAdmin() || request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if isAdmin();
     }
 
-    // PEDIDOS: Cualquiera puede generar su pedido al comprar; solo Admins pueden verlos y gestionarlos en el POS
+    // PEDIDOS / VENTAS: Cualquiera crea; Personal autorizado lee/actualiza; SOLO Administradores pueden eliminar ventas
     match /orders/{orderId} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, update: if request.auth != null;
+      allow delete: if isAdmin();
     }
 
-    // CONFIGURACIÓN: Todos pueden leer, solo Admins pueden modificar
+    // CONFIGURACIÓN: Todos pueden leer, solo Administradores pueden modificar
     match /config/{document=**} {
       allow read: if true;
       allow write: if isAdmin();

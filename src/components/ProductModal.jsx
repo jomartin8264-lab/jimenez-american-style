@@ -37,7 +37,7 @@ const ProductModal = ({ product, isOpen, onClose }) => {
               src={getProductImage(product)} 
               alt={product.name} 
               className="modal-image" 
-              onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+              onError={(e) => { e.target.onerror = null; e.target.src = '/images/brand_logo_1774572391476.png'; }}
             />
             {product.stock <= 0 && <span className="modal-badge out-of-stock">Agotado</span>}
             {effectiveStock <= 0 && product.stock > 0 && <span className="modal-badge in-cart">En tu Carrito</span>}
@@ -63,7 +63,7 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                 <Layers size={16} className="meta-icon" />
                 <div>
                   <span className="meta-label">SKU / Código</span>
-                  <span className="meta-value">{product.code || 'N/A'}</span>
+                  <span className="meta-value">{product.code || product.sku || 'N/A'}</span>
                 </div>
               </div>
 

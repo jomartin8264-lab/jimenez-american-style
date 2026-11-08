@@ -5,10 +5,12 @@ import { Printer, X } from 'lucide-react';
 export default function BarcodeModal({ product, onClose }) {
   const svgRef = useRef(null);
 
+  const barcodeValue = product?.code || product?.sku || product?.id;
+
   useEffect(() => {
-    if (svgRef.current && product?.code) {
+    if (svgRef.current && barcodeValue) {
       try {
-        JsBarcode(svgRef.current, String(product.code), {
+        JsBarcode(svgRef.current, String(barcodeValue), {
           format: "CODE128",
           width: 2,
           height: 50,
@@ -22,7 +24,7 @@ export default function BarcodeModal({ product, onClose }) {
         console.error("Error al generar código de barras:", err);
       }
     }
-  }, [product]);
+  }, [product, barcodeValue]);
 
   if (!product) return null;
 
@@ -76,7 +78,7 @@ export default function BarcodeModal({ product, onClose }) {
             {product.name}
           </div>
           <div style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-            {product.category || 'Prenda'} • SKU: {product.code || 'S/C'}
+            {product.category || 'Prenda'} • SKU: {barcodeValue || 'S/C'}
           </div>
           <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#10b981', marginBottom: '0.5rem' }}>
             ${Number(product.price).toFixed(2)} MXN

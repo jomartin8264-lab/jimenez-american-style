@@ -87,6 +87,42 @@ class SoundAlert {
       console.warn("Beep audio error:", e);
     }
   }
+
+  // Tono de error
+  playError() {
+    try {
+      this.initContext();
+      if (!this.audioCtx) return;
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch (e) {
+      console.warn("Error audio sound:", e);
+    }
+  }
 }
 
-export const soundAlert = new SoundAlert();
+const instance = new SoundAlert();
+
+export function soundAlert(type = 'beep') {
+  if (type === 'order' || type === 'chime') {
+    instance.playNewOrderChime();
+  } else if (type === 'error') {
+    instance.playError();
+  } else {
+    instance.playBeep();
+  }
+}
+
+soundAlert.playBeep = () => instance.playBeep();
+soundAlert.playNewOrderChime = () => instance.playNewOrderChime();
+soundAlert.playError = () => instance.playError();
+soundAlert.playSuccess = () => instance.playBeep();

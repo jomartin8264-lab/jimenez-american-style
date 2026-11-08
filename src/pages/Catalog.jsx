@@ -32,8 +32,10 @@ const Catalog = () => {
   }, []);
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (product.code && product.code.toLowerCase().includes(searchTerm.toLowerCase()));
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = product.name?.toLowerCase().includes(q) || 
+                          (product.code && product.code.toLowerCase().includes(q)) ||
+                          (product.sku && product.sku.toLowerCase().includes(q));
     const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });

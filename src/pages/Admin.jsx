@@ -19,7 +19,10 @@ const Admin = () => {
   
   // States
   const [adminList, setAdminList] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState('employee');
   const [newAdmin, setNewAdmin] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -71,11 +74,14 @@ const Admin = () => {
   useEffect(() => {
     const checkAccess = async () => {
       if (!currentUser) {
-        navigate('/');
+        navigate('/login');
         return;
       }
       
       try {
+        const currentEmail = currentUser.email?.toLowerCase();
+
+        // 1. Cargar lista de administradores tradicionales
         const docSnap = await getDoc(doc(db, "config", "admins"));
         let emails = ['jomartin8264@gmail.com'];
         if (docSnap.exists() && docSnap.data().emails) {
@@ -83,19 +89,48 @@ const Admin = () => {
         } else {
           await setDoc(doc(db, "config", "admins"), { emails });
         }
-        
         setAdminList(emails);
-        
-        if (!emails.includes(currentUser.email)) {
-          alert("Acceso denegado: Solo nuestro personal autorizado puede entrar aquí.");
-          navigate('/');
+
+        // 2. Cargar lista de personal (staff)
+        const staffSnap = await getDoc(doc(db, "config", "staff"));
+        let sList = [];
+        if (staffSnap.exists() && staffSnap.data().users) {
+          sList = staffSnap.data().users;
         } else {
-          fetchProducts();
-          fetchStoreInfo();
-          fetchCategories();
-          fetchApiSettings();
-          setCheckingAccess(false);
+          sList = emails.map(email => ({
+            email: email.toLowerCase(),
+            name: email.toLowerCase() === 'jomartin8264@gmail.com' ? 'JOMAR (Dueño)' : email.split('@')[0],
+            role: 'admin',
+            isMaster: email.toLowerCase() === 'jomartin8264@gmail.com',
+            createdAt: new Date().toISOString()
+          }));
+          await setDoc(doc(db, "config", "staff"), { users: sList });
         }
+        setStaffUsers(sList);
+
+        // 3. Determinar rol
+        const foundUser = sList.find(u => u.email?.toLowerCase() === currentEmail);
+        const isMaster = currentEmail === 'jomartin8264@gmail.com';
+        const isAdminUser = isMaster || emails.map(e => e.toLowerCase()).includes(currentEmail) || foundUser?.role === 'admin';
+        const isEmployeeUser = foundUser?.role === 'employee';
+
+        if (isAdminUser) {
+          setUserRole('admin');
+          setIsAdmin(true);
+        } else if (isEmployeeUser) {
+          setUserRole('employee');
+          setIsAdmin(false);
+        } else {
+          alert("Acceso denegado: Solo el personal autorizado (Administrador o Empleado) puede entrar aquí.");
+          navigate('/');
+          return;
+        }
+
+        fetchProducts();
+        fetchStoreInfo();
+        fetchCategories();
+        fetchApiSettings();
+        setCheckingAccess(false);
       } catch (err) {
         console.error(err);
         navigate('/');
@@ -222,9 +257,11 @@ const Admin = () => {
       }
 
       if (editingId) {
+        const productCode = (editForm.code && editForm.code.trim()) ? editForm.code.trim() : generateAutoSKU();
         const updateData = { 
           ...editForm, 
-          code: (editForm.code && editForm.code.trim()) ? editForm.code.trim() : generateAutoSKU(),
+          code: productCode,
+          sku: productCode,
           price: Number(editForm.price), 
           stock: Number(editForm.stock) 
         };
@@ -239,15 +276,20 @@ const Admin = () => {
           return;
         }
         const productCode = (newProduct.code && newProduct.code.trim()) ? newProduct.code.trim() : generateAutoSKU();
+        const authorEmail = currentUser.email || 'desconocido';
+        const authorName = currentUser.displayName || authorEmail.split('@')[0];
         await addDoc(collection(db, "products"), {
           ...newProduct,
           code: productCode,
+          sku: productCode,
           image: uploadedUrl,
           price: Number(newProduct.price),
           stock: Number(newProduct.stock),
+          createdBy: authorEmail,
+          createdByName: authorName,
           createdAt: new Date().toISOString()
         });
-        alert(`¡Prenda publicada con éxito! Código asignado: ${productCode}`);
+        alert(`¡Prenda publicada con éxito!\nCódigo SKU asignado automáticamente: ${productCode}`);
       }
       clearForm();
       fetchProducts();
@@ -272,7 +314,11 @@ const Admin = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("¿Eliminar prenda?")) {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo los administradores pueden eliminar prendas del inventario.");
+      return;
+    }
+    if (window.confirm("¿Eliminar prenda? Esta acción no se puede deshacer.")) {
       await deleteDoc(doc(db, "products", id));
       fetchProducts();
     }
@@ -308,22 +354,55 @@ const Admin = () => {
   const handleAddAdmin = async (e) => {
     e.preventDefault();
     const email = newAdmin.trim().toLowerCase();
+    if (!email) return;
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("email", "==", email));
     const snap = await getDocs(q);
-    if (snap.empty) return alert("Usuario no encontrado.");
+    if (snap.empty) return alert("Usuario no encontrado en el sistema. Debe registrarse primero.");
     
-    const updated = [...adminList, email];
-    await setDoc(doc(db, "config", "admins"), { emails: updated });
-    setAdminList(updated);
+    if (!adminList.includes(email)) {
+      const updated = [...adminList, email];
+      await setDoc(doc(db, "config", "admins"), { emails: updated });
+      setAdminList(updated);
+    }
+
+    let updatedStaff = [...staffUsers];
+    const existingIndex = updatedStaff.findIndex(u => u.email.toLowerCase() === email);
+    if (existingIndex >= 0) {
+      updatedStaff[existingIndex].role = 'admin';
+    } else {
+      updatedStaff.push({
+        email,
+        name: email.split('@')[0],
+        role: 'admin',
+        isMaster: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+    await setDoc(doc(db, "config", "staff"), { users: updatedStaff });
+    setStaffUsers(updatedStaff);
     setNewAdmin('');
+    alert(`¡${email} ahora tiene permisos de Administrador!`);
   };
 
   const handleRemoveAdmin = async (email) => {
-    if (email === 'jomartin8264@gmail.com') return;
+    if (email === 'jomartin8264@gmail.com') {
+      alert("No puedes revocar los permisos del administrador principal.");
+      return;
+    }
+    if (!window.confirm(`¿Revocar permisos de administrador a ${email}?`)) return;
     const updated = adminList.filter(e => e !== email);
     await setDoc(doc(db, "config", "admins"), { emails: updated });
     setAdminList(updated);
+
+    const updatedStaff = staffUsers.map(u => {
+      if (u.email.toLowerCase() === email.toLowerCase()) {
+        return { ...u, role: 'employee' };
+      }
+      return u;
+    });
+    await setDoc(doc(db, "config", "staff"), { users: updatedStaff });
+    setStaffUsers(updatedStaff);
   };
 
   if (checkingAccess) return <div style={{ paddingTop: '150px', textAlign: 'center' }}><p>Verificando...</p></div>;
@@ -334,7 +413,27 @@ const Admin = () => {
       <div className="admin-container" style={{ paddingTop: '100px', paddingBottom: '50px' }}>
         <div className="container">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <h1 style={{ color: 'var(--color-primary)', margin: 0 }}>Panel de Administración</h1>
+            <div>
+              <h1 style={{ color: 'var(--color-primary)', margin: 0 }}>
+                {isAdmin ? 'Panel de Administración' : 'Panel de Inventario y Registro'}
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.4rem' }}>
+                <span style={{ 
+                  backgroundColor: isAdmin ? 'rgba(234, 179, 8, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                  color: isAdmin ? '#eab308' : '#38bdf8',
+                  padding: '0.2rem 0.65rem',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  border: `1px solid ${isAdmin ? 'rgba(234, 179, 8, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`
+                }}>
+                  {isAdmin ? '👑 Administrador' : '👔 Empleado'}
+                </span>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                  {currentUser?.email}
+                </span>
+              </div>
+            </div>
             <button 
               onClick={() => navigate('/pos')}
               className="btn btn-primary"
@@ -365,29 +464,31 @@ const Admin = () => {
                 </div>
 
                 <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                    <label style={{ margin: 0 }}>Código de Barras / SKU (Automático)</label>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        const auto = generateAutoSKU();
-                        if (editingId) setEditForm(prev => ({ ...prev, code: auto }));
-                        else setNewProduct(prev => ({ ...prev, code: auto }));
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    >
-                      🔄 Generar nuevo
-                    </button>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span>Código de Barras / SKU</span>
+                    <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(52, 211, 153, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                      ⚡ 100% Automático
+                    </span>
+                  </label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.7rem 0.9rem',
+                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px dashed rgba(56, 189, 248, 0.4)',
+                    borderRadius: '8px',
+                    fontFamily: 'monospace',
+                    fontSize: '0.95rem',
+                    color: '#38bdf8'
+                  }}>
+                    <strong>{editingId ? (editForm.code || generateAutoSKU()) : (newProduct.code || generateAutoSKU())}</strong>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      Generado por el sistema
+                    </span>
                   </div>
-                  <input 
-                    type="text" 
-                    value={editingId ? editForm.code : newProduct.code} 
-                    onChange={(e) => editingId ? setEditForm({...editForm, code: e.target.value}) : setNewProduct({...newProduct, code: e.target.value})} 
-                    className="input-field" 
-                    placeholder="Se genera automáticamente"
-                  />
-                  <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                    Este código se usará para generar la etiqueta imprimible y cobrar con lector.
+                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.35rem', display: 'block' }}>
+                    No tienes que escribirlo: el sistema lo crea y asigna automáticamente para cobrar y generar su código de barras.
                   </small>
                 </div>
 
@@ -447,14 +548,19 @@ const Admin = () => {
                         src={getProductImage(p)} 
                         alt={p.name} 
                         style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} 
-                        onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+                        onError={(e) => { e.target.onerror = null; e.target.src = '/images/brand_logo_1774572391476.png'; }}
                       />
                     )}
                     <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
                       <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-                        ${p.price} | Stock: {p.stock} | SKU: {p.code || 'N/A'} | <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
+                        ${p.price} | Stock: {p.stock} | SKU: {p.code || p.sku || 'N/A'} | <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
                       </div>
+                      {(p.createdByName || p.createdBy) && (
+                        <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '3px' }}>
+                          👤 Alta por: <strong>{p.createdByName || p.createdBy?.split('@')[0]}</strong>
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <button 
@@ -467,7 +573,15 @@ const Admin = () => {
                         🏷️ Barcode
                       </button>
                       <button onClick={() => handleEdit(p)} className="btn btn-sm">Edit</button>
-                      <button onClick={() => handleDelete(p.id)} className="btn btn-danger btn-sm">X</button>
+                      {isAdmin && (
+                        <button 
+                          onClick={() => handleDelete(p.id)} 
+                          className="btn btn-danger btn-sm"
+                          title="Eliminar prenda (Solo Administrador)"
+                        >
+                          X
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -506,89 +620,93 @@ const Admin = () => {
             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
               {categories.map(c => (
                 <span key={c} style={{ padding: '5px 15px', border: '1px solid var(--color-border)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  {c} <b onClick={() => handleRemoveCategory(c)} style={{ color: 'red', cursor: 'pointer' }}>×</b>
+                  {c} {isAdmin && <b onClick={() => handleRemoveCategory(c)} style={{ color: 'red', cursor: 'pointer' }}>×</b>}
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="admin-card glass" style={{ marginTop: '2rem' }}>
-            <h2>Empresa y Contacto</h2>
-            <form onSubmit={handleSaveStoreInfo} className="admin-form">
-              <div className="form-group">
-                <label>Descripción de Nosotros</label>
-                <textarea value={storeInfo.description} onChange={(e) => setStoreInfo({...storeInfo, description: e.target.value})} className="input-field" rows="3" />
+          {isAdmin && (
+            <>
+              <div className="admin-card glass" style={{ marginTop: '2rem' }}>
+                <h2>Empresa y Contacto</h2>
+                <form onSubmit={handleSaveStoreInfo} className="admin-form">
+                  <div className="form-group">
+                    <label>Descripción de Nosotros</label>
+                    <textarea value={storeInfo.description} onChange={(e) => setStoreInfo({...storeInfo, description: e.target.value})} className="input-field" rows="3" />
+                  </div>
+                  <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '10px' }}>
+                    <div className="form-group">
+                      <label>Dirección</label>
+                      <input type="text" value={storeInfo.address} onChange={(e) => setStoreInfo({...storeInfo, address: e.target.value})} className="input-field" placeholder="Dirección" />
+                    </div>
+                    <div className="form-group">
+                      <label>Teléfono (WhatsApp)</label>
+                      <input type="text" value={storeInfo.phone} onChange={(e) => setStoreInfo({...storeInfo, phone: e.target.value})} className="input-field" placeholder="Teléfono" />
+                    </div>
+                  </div>
+                  <button disabled={savingInfo} type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>{savingInfo ? 'Guardando...' : 'Actualizar'}</button>
+                </form>
               </div>
-              <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '10px' }}>
-                <div className="form-group">
-                  <label>Dirección</label>
-                  <input type="text" value={storeInfo.address} onChange={(e) => setStoreInfo({...storeInfo, address: e.target.value})} className="input-field" placeholder="Dirección" />
-                </div>
-                <div className="form-group">
-                  <label>Teléfono (WhatsApp)</label>
-                  <input type="text" value={storeInfo.phone} onChange={(e) => setStoreInfo({...storeInfo, phone: e.target.value})} className="input-field" placeholder="Teléfono" />
-                </div>
-              </div>
-              <button disabled={savingInfo} type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>{savingInfo ? 'Guardando...' : 'Actualizar'}</button>
-            </form>
-          </div>
 
-          <div className="admin-card glass" style={{ marginTop: '2rem' }}>
-            <h2>🔧 Configuración del Sistema (APIs y Canales)</h2>
-            <form onSubmit={handleSaveApiSettings} className="admin-form">
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label>Telegram Bot Token</label>
-                <input 
-                  type="text" 
-                  value={apiSettings.telegramToken} 
-                  onChange={(e) => setApiSettings({...apiSettings, telegramToken: e.target.value})} 
-                  className="input-field" 
-                  placeholder="Bot Token"
-                />
+              <div className="admin-card glass" style={{ marginTop: '2rem' }}>
+                <h2>🔧 Configuración del Sistema (APIs y Canales)</h2>
+                <form onSubmit={handleSaveApiSettings} className="admin-form">
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label>Telegram Bot Token</label>
+                    <input 
+                      type="text" 
+                      value={apiSettings.telegramToken} 
+                      onChange={(e) => setApiSettings({...apiSettings, telegramToken: e.target.value})} 
+                      className="input-field" 
+                      placeholder="Bot Token"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label>Telegram Chat ID</label>
+                    <input 
+                      type="text" 
+                      value={apiSettings.telegramChatId} 
+                      onChange={(e) => setApiSettings({...apiSettings, telegramChatId: e.target.value})} 
+                      className="input-field" 
+                      placeholder="Chat ID"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label>ImgBB API Key (Subida de Imágenes)</label>
+                    <input 
+                      type="text" 
+                      value={apiSettings.imgbbApiKey} 
+                      onChange={(e) => setApiSettings({...apiSettings, imgbbApiKey: e.target.value})} 
+                      className="input-field" 
+                      placeholder="API Key de ImgBB"
+                    />
+                  </div>
+                  <button disabled={savingApi} type="submit" className="btn btn-primary">
+                    {savingApi ? 'Guardando...' : 'Actualizar Llaves'}
+                  </button>
+                </form>
               </div>
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label>Telegram Chat ID</label>
-                <input 
-                  type="text" 
-                  value={apiSettings.telegramChatId} 
-                  onChange={(e) => setApiSettings({...apiSettings, telegramChatId: e.target.value})} 
-                  className="input-field" 
-                  placeholder="Chat ID"
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label>ImgBB API Key (Subida de Imágenes)</label>
-                <input 
-                  type="text" 
-                  value={apiSettings.imgbbApiKey} 
-                  onChange={(e) => setApiSettings({...apiSettings, imgbbApiKey: e.target.value})} 
-                  className="input-field" 
-                  placeholder="API Key de ImgBB"
-                />
-              </div>
-              <button disabled={savingApi} type="submit" className="btn btn-primary">
-                {savingApi ? 'Guardando...' : 'Actualizar Llaves'}
-              </button>
-            </form>
-          </div>
 
-          <div className="admin-card glass" style={{ marginTop: '2rem' }}>
-            <h2>Admins Autorizados</h2>
-            <form onSubmit={handleAddAdmin} style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
-              <input type="email" value={newAdmin} onChange={(e) => setNewAdmin(e.target.value)} className="input-field" placeholder="Correo electrónico del nuevo administrador" />
-              <button type="submit" className="btn btn-primary">Añadir</button>
-            </form>
-            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-              {adminList.map(email => (
-                <span key={email} style={{ padding: '5px 15px', border: '1px solid var(--color-border)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  {email} 
-                  {email !== 'jomartin8264@gmail.com' && (
-                    <b onClick={() => handleRemoveAdmin(email)} style={{ color: 'red', cursor: 'pointer' }}>×</b>
-                  )}
-                </span>
-              ))}
-            </div>
-          </div>
+              <div className="admin-card glass" style={{ marginTop: '2rem' }}>
+                <h2>Admins Autorizados</h2>
+                <form onSubmit={handleAddAdmin} style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+                  <input type="email" value={newAdmin} onChange={(e) => setNewAdmin(e.target.value)} className="input-field" placeholder="Correo electrónico del nuevo administrador" />
+                  <button type="submit" className="btn btn-primary">Añadir</button>
+                </form>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                  {adminList.map(email => (
+                    <span key={email} style={{ padding: '5px 15px', border: '1px solid var(--color-border)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {email} 
+                      {email !== 'jomartin8264@gmail.com' && (
+                        <b onClick={() => handleRemoveAdmin(email)} style={{ color: 'red', cursor: 'pointer' }}>×</b>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
       </div>

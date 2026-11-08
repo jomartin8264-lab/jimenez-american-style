@@ -89,9 +89,11 @@ const Cart = () => {
       });
       await batch.commit();
 
-      // 2.5 Guardar orden en Firestore (si las reglas de la base de datos lo permiten)
+      // 2.5 Guardar orden en Firestore con su folio oficial
+      const webFolio = `WEB-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
       try {
         await addDoc(collection(db, "orders"), {
+          folio: webFolio,
           clientName: checkoutData.name,
           clientEmail: currentUser.email,
           clientPhone: checkoutData.phone,
@@ -119,6 +121,7 @@ const Cart = () => {
       try {
         if (apiSettings.telegramChatId && apiSettings.telegramChatId !== 'TU_CHAT_ID_AQUI') {
           let message = `🛒 *NUEVO PEDIDO - Jiménez American Style*\n\n`;
+          message += `🔖 *Folio:* \`${webFolio}\`\n`;
           message += `👤 *Cliente:* ${checkoutData.name} (${currentUser.email})\n`;
           message += `📞 *Teléfono:* ${checkoutData.phone}\n`;
           message += `🏠 *Dirección:* ${checkoutData.address}\n`;

@@ -43,24 +43,35 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`===============================================`);
-  console.log(`  Punto de Venta Alina iniciado en puerto ${PORT}`);
-  console.log(`===============================================`);
-
+function launchBrowser() {
   const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-  
   const appUrl = `http://localhost:${PORT}/pos`;
   
   let browserCmd;
   if (fs.existsSync(chromePath)) {
-    browserCmd = `"${chromePath}" --app="${appUrl}"`;
+    browserCmd = `start "" "${chromePath}" --app="${appUrl}"`;
   } else if (fs.existsSync(edgePath)) {
-    browserCmd = `"${edgePath}" --app="${appUrl}"`;
+    browserCmd = `start "" "${edgePath}" --app="${appUrl}"`;
   } else {
-    browserCmd = `start ${appUrl}`;
+    browserCmd = `start "" "${appUrl}"`;
   }
 
   exec(browserCmd);
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    // El servidor ya está activo en segundo plano, abrimos la ventana
+    launchBrowser();
+  } else {
+    console.error('Error en el servidor:', err);
+  }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`===============================================`);
+  console.log(`  Punto de Venta Alina iniciado en puerto ${PORT}`);
+  console.log(`===============================================`);
+  launchBrowser();
 });

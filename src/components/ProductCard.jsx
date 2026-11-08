@@ -36,7 +36,7 @@ const ProductCard = ({ product }) => {
             src={getProductImage(product)} 
             alt={product.name} 
             className="product-image"
-            onError={(e) => { e.target.src = '/images/brand_logo_1774572391476.png'; }}
+            onError={(e) => { e.target.onerror = null; e.target.src = '/images/brand_logo_1774572391476.png'; }}
           />
           <div className="product-overlay">
             <div style={{ display: 'flex', gap: '0.5rem' }}>

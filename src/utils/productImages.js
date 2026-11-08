@@ -1,38 +1,19 @@
 // Helper para resolver imágenes de productos con fallback seguro
-// Reemplaza automáticamente URLs caídas de ImgBB por las imágenes locales
 
 export function getProductImage(product) {
   if (!product) return '/images/brand_logo_1774572391476.png';
   const img = product.image;
 
-  if (!img) return '/images/brand_logo_1774572391476.png';
-
-  // Si la imagen viene de ImgBB (servicio gratuito que frecuentemente cae en 503)
-  if (typeof img === 'string' && img.includes('ibb.co')) {
-    const name = (product.name || '').toLowerCase();
-    if (name.includes('meclilla') || name.includes('mezclilla') || name.includes('azul')) {
-      return '/images/alina1.JPG';
-    }
-    if (name.includes('camisa') || name.includes('caballero')) {
-      return '/images/alina2.JPG';
-    }
-    if (name.includes('chamarra')) {
-      return '/images/alina3.JPG';
-    }
-    if (name.includes('dama')) {
-      return '/images/alina 4.JPG';
-    }
-    if (name.includes('pijama') || name.includes('picachu') || name.includes('niños')) {
-      return '/images/alina5.JPG';
-    }
+  if (!img || typeof img !== 'string' || img.trim() === '') {
     return '/images/brand_logo_1774572391476.png';
   }
 
-  return img;
+  // Devolver siempre la imagen real subida por el usuario
+  return img.trim();
 }
 
 // Comprime una imagen seleccionada por el usuario en formato WebP/JPEG Base64
-// para guardarla directamente en Firestore sin depender de ImgBB
+// para guardarla directamente en Firestore sin depender de servicios externos
 export function compressImageToBase64(file) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve(null);

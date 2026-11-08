@@ -263,6 +263,53 @@
 .pos-stock-badge.low { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; }
 .pos-stock-badge.empty { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
+.pos-card-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pos-btn-barcode,
+.pos-btn-delete {
+  flex: 1;
+  padding: 0.3rem 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+  pointer-events: auto;
+}
+
+.pos-btn-barcode {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.pos-btn-barcode:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
+.pos-btn-delete {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+.pos-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
 /* Panel de cobro / ticket lateral */
 .pos-ticket-sidebar {
   width: 380px;
@@ -658,8 +705,10 @@
   background: #fff;
   color: #111;
   width: 100%;
-  max-width: 360px;
-  border-radius: 8px;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 12px;
   padding: 1.5rem;
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
@@ -671,6 +720,134 @@
   border-bottom: 1px dashed #aaa;
   padding-bottom: 1rem;
   margin-bottom: 1rem;
+}
+
+/* Botón de impresión en pedidos web */
+.pos-btn-print-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  background-color: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.pos-btn-print-order:hover {
+  background-color: rgba(56, 189, 248, 0.3);
+  color: #fff;
+}
+
+/* Botón de reimpresión en tabla de ventas */
+.pos-btn-reprint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  background-color: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pos-btn-reprint:hover {
+  background-color: rgba(56, 189, 248, 0.25);
+  color: #fff;
+}
+
+/* Acciones de concepto manual en ticket sidebar */
+.pos-btn-open-manual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.45rem;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 0.4rem 0;
+  transition: all 0.15s ease;
+}
+.pos-btn-open-manual:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
+.pos-manual-item-form {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.6rem;
+  margin: 0.4rem 0;
+}
+.pos-input-sm {
+  padding: 0.4rem 0.5rem;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.8rem;
+}
+.pos-input-sm:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+.pos-btn-add-manual {
+  flex: 1;
+  padding: 0.4rem;
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pos-btn-cancel-sm {
+  padding: 0.4rem 0.6rem;
+  background: #475569;
+  color: #cbd5e1;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+/* Modal de configuración de ticket */
+.pos-config-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 1rem;
+}
+.pos-config-modal-box {
+  background: #1e293b;
+  color: #f8fafc;
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
 /* REGLAS PARA IMPRESIÓN */
@@ -685,10 +862,12 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 80mm;
-    color: #000;
-    background: #fff;
-    padding: 5mm;
+    width: 78mm;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 3mm 4mm;
+    box-shadow: none !important;
+    border: none !important;
   }
   #printable-barcode-tag, #printable-barcode-tag * {
     visibility: visible;
