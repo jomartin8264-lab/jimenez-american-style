@@ -387,15 +387,26 @@ export default function POS() {
     }
   };
 
-  // 2. Suscripción en Tiempo Real a Productos / Inventario (Tanto Admin como Empleado)
+  // 2. Suscripción en Tiempo Real a Productos / Inventario y Categorías
   useEffect(() => {
     if (!currentUser) return;
+
+    let dbCategories = ['Dama', 'Caballero', 'Niños', 'Bebés', 'Accesorios', 'Calzado', 'Otros'];
+
+    // Consultar categorías configuradas en la tienda
+    getDoc(doc(db, "config", "categories")).then(snap => {
+      if (snap.exists() && Array.isArray(snap.data().list) && snap.data().list.length > 0) {
+        dbCategories = Array.from(new Set([...dbCategories, ...snap.data().list]));
+        setCategories(prev => Array.from(new Set(['Todos', ...dbCategories, ...prev])));
+      }
+    }).catch(err => console.warn(err));
+
     const unsub = onSnapshot(collection(db, "products"), (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setProducts(list);
 
-      // Extraer categorías únicas
-      const cats = new Set(['Todos']);
+      // Extraer categorías únicas asegurando que siempre existan las básicas
+      const cats = new Set(['Todos', ...dbCategories]);
       list.forEach(p => {
         if (p.category) cats.add(p.category);
       });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   X, Camera, Scan, CheckCircle2, AlertTriangle, 
@@ -10,10 +10,12 @@ import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { compressImageToBase64 } from '../utils/productImages';
 import { soundAlert } from '../utils/soundAlert';
 
+const BASE_CATEGORIES = ['Dama', 'Caballero', 'Niños', 'Bebés', 'Accesorios', 'Calzado', 'Otros'];
+
 export default function QuickProductEntryModal({ 
   isOpen, 
   onClose, 
-  categories = ['Dama', 'Caballero', 'Niños', 'Accesorios', 'Otros'],
+  categories = BASE_CATEGORIES,
   onProductSaved
 }) {
   const { currentUser } = useAuth();
@@ -23,12 +25,37 @@ export default function QuickProductEntryModal({
     return window.innerWidth <= 768 ? 'mobile' : 'pc';
   });
 
+  // Lista enriquecida de categorías
+  const [availableCategories, setAvailableCategories] = useState(() => {
+    const passed = Array.isArray(categories) && categories.length > 0 ? categories : [];
+    return Array.from(new Set([...BASE_CATEGORIES, ...passed]));
+  });
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCatName, setCustomCatName] = useState('');
+
+  // Cargar categorías guardadas en la configuración de la tienda en Firestore
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const snap = await getDoc(doc(db, "config", "categories"));
+        if (snap.exists() && Array.isArray(snap.data().list) && snap.data().list.length > 0) {
+          const fromDb = snap.data().list;
+          const passed = Array.isArray(categories) && categories.length > 0 ? categories : [];
+          setAvailableCategories(Array.from(new Set([...BASE_CATEGORIES, ...fromDb, ...passed])));
+        }
+      } catch (err) {
+        console.warn("Error cargando categorías:", err);
+      }
+    };
+    loadCategories();
+  }, [categories]);
+
   // Campos del formulario
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [size, setSize] = useState('M');
   const [customSize, setCustomSize] = useState('');
-  const [category, setCategory] = useState(categories[0] || 'Dama');
+  const [category, setCategory] = useState('Dama');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('1');
   const [description, setDescription] = useState('');
@@ -133,6 +160,8 @@ export default function QuickProductEntryModal({
     setImageFile(null);
     setImagePreview(null);
     setExistingProduct(null);
+    setIsCustomCategory(false);
+    setCustomCatName('');
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     setTimeout(() => {
@@ -211,6 +240,7 @@ export default function QuickProductEntryModal({
       const authorEmail = currentUser?.email || 'mostrador';
       const authorName = currentUser?.displayName || authorEmail.split('@')[0];
       const finalSize = customSize.trim() ? customSize.trim().toUpperCase() : size;
+      const finalCategory = isCustomCategory && customCatName.trim() ? customCatName.trim() : (category || 'Dama');
 
       const productPayload = {
         name: name.trim(),
@@ -219,7 +249,7 @@ export default function QuickProductEntryModal({
         code: cleanCode,
         sku: cleanCode,
         size: finalSize,
-        category: category || 'Dama',
+        category: finalCategory,
         description: description.trim(),
         availableOnline: Boolean(availableOnline),
         image: uploadedUrl,
@@ -549,27 +579,80 @@ export default function QuickProductEntryModal({
 
             {/* CATEGORÍA */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.35rem' }}>
-                4. Categoría:
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.7rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #475569',
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  boxSizing: 'border-box'
-                }}
-              >
-                {categories.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', margin: 0 }}>
+                  4. Categoría:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomCategory(!isCustomCategory);
+                    if (!isCustomCategory) setCustomCatName('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#38bdf8',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    padding: 0
+                  }}
+                >
+                  {isCustomCategory ? '← Ver lista' : '+ Otra...'}
+                </button>
+              </div>
+
+              {isCustomCategory ? (
+                <input
+                  type="text"
+                  placeholder="Escribe la nueva categoría..."
+                  value={customCatName}
+                  onChange={(e) => {
+                    setCustomCatName(e.target.value);
+                    setCategory(e.target.value);
+                  }}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.7rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #38bdf8',
+                    color: '#38bdf8',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box',
+                    fontWeight: 700
+                  }}
+                />
+              ) : (
+                <select
+                  value={category}
+                  onChange={(e) => {
+                    if (e.target.value === '__NEW__') {
+                      setIsCustomCategory(true);
+                      setCustomCatName('');
+                    } else {
+                      setCategory(e.target.value);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.7rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  {availableCategories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                  <option value="__NEW__">+ Escribir otra categoría...</option>
+                </select>
+              )}
             </div>
           </div>
 
