@@ -17,6 +17,7 @@ import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
+import QuickProductEntryModal from '../components/QuickProductEntryModal';
 import useSEO from '../hooks/useSEO';
 import './POS.css';
 
@@ -108,9 +109,10 @@ export default function POS() {
     if (soundEnabled) soundAlert('beep');
   };
 
-  // Modal de código de barras
+  // Modal de código de barras y alta rápida
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showQuickEntryModal, setShowQuickEntryModal] = useState(false);
 
   // Gestión de Usuarios y Roles (Administradores y Empleados)
   const [userRole, setUserRole] = useState('employee'); // 'admin' | 'employee'
@@ -884,11 +886,31 @@ export default function POS() {
           >
             🏷️ Hoja de Etiquetas
           </button>
+          <button 
+            type="button"
+            onClick={() => setShowQuickEntryModal(true)}
+            style={{ 
+              color: '#38bdf8', 
+              background: 'rgba(56, 189, 248, 0.15)', 
+              border: '1px solid rgba(56, 189, 248, 0.35)', 
+              fontSize: '0.85rem', 
+              padding: '0.5rem 0.8rem', 
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+            title="Alta ultrarrápida escaneando código ya pegado (PC o Celular)"
+          >
+            ⚡ Alta Rápida
+          </button>
           <Link 
             to="/admin" 
             style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '0.85rem', padding: '0.5rem 0.8rem', background: '#334155', borderRadius: '6px' }}
           >
-            Alta de Prendas
+            Panel Admin
           </Link>
           <Link 
             to="/" 
@@ -957,9 +979,23 @@ export default function POS() {
                     </div>
                     <div className="pos-card-body">
                       <div className="pos-card-title" title={p.name}>{p.name}</div>
-                      <div className="pos-card-meta">
+                      <div className="pos-card-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
                         <span>{p.category || 'Ropa'}</span>
+                        {p.size && (
+                          <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            Talla: {p.size}
+                          </span>
+                        )}
                         {(p.code || p.sku) && <span>SKU: {p.code || p.sku}</span>}
+                        {p.availableOnline === false ? (
+                          <span style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.35)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 600 }}>
+                            🏬 Tienda
+                          </span>
+                        ) : (
+                          <span style={{ backgroundColor: 'rgba(52, 211, 153, 0.12)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 600 }}>
+                            🌐 Web
+                          </span>
+                        )}
                       </div>
                       <div className="pos-card-footer">
                         <span className="pos-card-price">${Number(p.price).toFixed(2)}</span>
@@ -2392,6 +2428,15 @@ export default function POS() {
         <BatchBarcodeModal 
           products={products} 
           onClose={() => setShowBatchModal(false)} 
+        />
+      )}
+
+      {/* MODAL DE ALTA RÁPIDA DE PRENDAS (PC Y CELULAR) */}
+      {showQuickEntryModal && (
+        <QuickProductEntryModal
+          isOpen={showQuickEntryModal}
+          onClose={() => setShowQuickEntryModal(false)}
+          categories={categories.filter(c => c !== 'Todos')}
         />
       )}
     </div>

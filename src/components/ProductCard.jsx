@@ -75,7 +75,22 @@ const ProductCard = ({ product }) => {
         </div>
         
         <div className="product-info">
-          <p className="product-brand">{product.category || 'Jiménez'}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+            <p className="product-brand" style={{ margin: 0 }}>{product.category || 'Jiménez'}</p>
+            {product.size && (
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                border: '1px solid rgba(56, 189, 248, 0.3)'
+              }}>
+                Talla: {product.size}
+              </span>
+            )}
+          </div>
           <h3 className="product-title">{product.name}</h3>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>

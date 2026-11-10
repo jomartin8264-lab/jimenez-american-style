@@ -8,6 +8,7 @@ import './Admin.css';
 import useSEO from '../hooks/useSEO';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
+import QuickProductEntryModal from '../components/QuickProductEntryModal';
 import { getProductImage, compressImageToBase64 } from '../utils/productImages';
 
 const Admin = () => {
@@ -32,6 +33,12 @@ const Admin = () => {
   const [imageFile, setImageFile] = useState(null);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showQuickEntryModal, setShowQuickEntryModal] = useState(false);
+
+  // Estado para promover prendas "Solo Tienda" a Web
+  const [promotingProduct, setPromotingProduct] = useState(null);
+  const [promoteImageFile, setPromoteImageFile] = useState(null);
+  const [isPromoting, setIsPromoting] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,11 +63,11 @@ const Admin = () => {
 
   // Form states
   const [newProduct, setNewProduct] = useState({
-    name: '', price: '', stock: '', code: generateAutoSKU(), image: '', category: ''
+    name: '', price: '', stock: '1', code: '', size: 'M', image: '', category: '', description: '', availableOnline: false
   });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
-    name: '', price: '', stock: '', code: '', image: '', category: ''
+    name: '', price: '', stock: '', code: '', size: 'M', image: '', category: '', description: '', availableOnline: true
   });
 
   // Store Info states
@@ -265,7 +272,8 @@ const Admin = () => {
           code: productCode,
           sku: productCode,
           price: Number(editForm.price), 
-          stock: Number(editForm.stock) 
+          stock: Number(editForm.stock),
+          availableOnline: editForm.availableOnline !== false
         };
         if (uploadedUrl) updateData.image = uploadedUrl;
         await updateDoc(doc(db, "products", editingId), updateData);
@@ -273,9 +281,14 @@ const Admin = () => {
         setEditingId(null);
       } else {
         if (!uploadedUrl) {
-          alert("Por favor selecciona o toma una foto de la prenda.");
-          setLoading(false);
-          return;
+          if (newProduct.availableOnline) {
+            const proceed = window.confirm("Has marcado publicar en la web pero no has elegido foto. ¿Deseas publicarla con el logo de la tienda o prefieres tomar una foto primero?");
+            if (!proceed) {
+              setLoading(false);
+              return;
+            }
+          }
+          uploadedUrl = '/images/brand_logo_1774572391476.png';
         }
         const productCode = (newProduct.code && newProduct.code.trim()) ? newProduct.code.trim() : generateAutoSKU();
         const authorEmail = currentUser.email || 'desconocido';
@@ -287,12 +300,14 @@ const Admin = () => {
           image: uploadedUrl,
           price: Number(newProduct.price),
           stock: Number(newProduct.stock),
+          size: newProduct.size || 'M',
+          availableOnline: Boolean(newProduct.availableOnline),
           createdBy: authorEmail,
           createdByName: authorName,
           createdAt: new Date().toISOString(),
-          labeled: false
+          labeled: Boolean(newProduct.code && newProduct.code.trim())
         });
-        alert(`¡Prenda publicada con éxito!\nCódigo SKU asignado automáticamente: ${productCode}`);
+        alert(`¡Prenda registrada con éxito!\nCódigo SKU: ${productCode}\nCanal: ${newProduct.availableOnline ? '🌐 Publicado en Web y Tienda' : '🏬 Solo Tienda Física'}`);
       }
       clearForm();
       fetchProducts();
@@ -309,8 +324,11 @@ const Admin = () => {
       price: product.price,
       stock: product.stock,
       code: product.code || generateAutoSKU(),
+      size: product.size || 'M',
       image: product.image,
-      category: product.category || categories[0]
+      category: product.category || categories[0],
+      description: product.description || '',
+      availableOnline: product.availableOnline !== false
     });
     setImageFile(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -328,9 +346,40 @@ const Admin = () => {
   };
 
   const clearForm = () => {
-    setNewProduct({ name: '', price: '', stock: '', code: generateAutoSKU(), image: '', category: categories[0] || '' });
+    setNewProduct({ name: '', price: '', stock: '1', code: '', size: 'M', image: '', category: categories[0] || '', description: '', availableOnline: false });
     setEditingId(null);
     setImageFile(null);
+  };
+
+  // Promover una prenda "Solo Tienda" para que se publique en la Tienda Web
+  const handleConfirmPromote = async (e) => {
+    e.preventDefault();
+    if (!promotingProduct) return;
+    setIsPromoting(true);
+    try {
+      let uploadedUrl = null;
+      if (promoteImageFile) {
+        uploadedUrl = await compressImageToBase64(promoteImageFile);
+        if (!uploadedUrl) {
+          uploadedUrl = await uploadToImgBB(promoteImageFile);
+        }
+      }
+      const updateData = {
+        availableOnline: true
+      };
+      if (uploadedUrl) {
+        updateData.image = uploadedUrl;
+      }
+      await updateDoc(doc(db, "products", promotingProduct.id), updateData);
+      alert(`¡"${promotingProduct.name}" ahora está publicada y disponible en la tienda web!`);
+      setPromotingProduct(null);
+      setPromoteImageFile(null);
+      fetchProducts();
+    } catch (err) {
+      alert("Error al publicar en la web: " + (err.message || err));
+    } finally {
+      setIsPromoting(false);
+    }
   };
 
   const handleSaveStoreInfo = async (e) => {
@@ -440,6 +489,15 @@ const Admin = () => {
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
+                onClick={() => setShowQuickEntryModal(true)}
+                className="btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#38bdf8', color: '#0f172a', fontWeight: 'bold', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                title="Alta ultrarrápida escaneando código ya pegado"
+              >
+                ⚡ Alta Rápida (Pistola / Celular)
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowBatchModal(true)}
                 className="btn btn-secondary"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
@@ -480,30 +538,57 @@ const Admin = () => {
                 <div className="form-group">
                   <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span>Código de Barras / SKU</span>
-                    <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(52, 211, 153, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                      ⚡ 100% Automático
+                    <span style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                      🎯 Escanear o Auto
                     </span>
                   </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.7rem 0.9rem',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                    border: '1px dashed rgba(56, 189, 248, 0.4)',
-                    borderRadius: '8px',
-                    fontFamily: 'monospace',
-                    fontSize: '0.95rem',
-                    color: '#38bdf8'
-                  }}>
-                    <strong>{editingId ? (editForm.code || generateAutoSKU()) : (newProduct.code || generateAutoSKU())}</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      Generado por el sistema
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Escanea el código de la etiqueta pegada (o déjalo en blanco para auto)"
+                    value={editingId ? (editForm.code || '') : (newProduct.code || '')}
+                    onChange={(e) => editingId ? setEditForm({...editForm, code: e.target.value}) : setNewProduct({...newProduct, code: e.target.value})}
+                    className="input-field"
+                    style={{ fontFamily: 'monospace', fontWeight: 700 }}
+                  />
                   <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.35rem', display: 'block' }}>
-                    No tienes que escribirlo: el sistema lo crea y asigna automáticamente para cobrar y generar su código de barras.
+                    Si ya le pegaste un sticker pre-impreso, dale el pistolazo aquí. Si lo dejas vacío, el sistema generará uno automáticamente.
                   </small>
+                </div>
+
+                {/* TALLA */}
+                <div className="form-group">
+                  <label>Talla</label>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                    {['CH', 'M', 'G', 'XL', 'Uni'].map(t => {
+                      const curSize = editingId ? editForm.size : newProduct.size;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => editingId ? setEditForm({...editForm, size: t}) : setNewProduct({...newProduct, size: t})}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '5px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            border: curSize === t ? '1px solid #38bdf8' : '1px solid #334155',
+                            backgroundColor: curSize === t ? '#38bdf8' : 'var(--color-surface)',
+                            color: curSize === t ? '#0f172a' : '#cbd5e1',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="O escribe otra talla (ej. 32, 7.5)" 
+                    value={editingId ? (editForm.size || '') : (newProduct.size || '')} 
+                    onChange={(e) => editingId ? setEditForm({...editForm, size: e.target.value}) : setNewProduct({...newProduct, size: e.target.value})} 
+                    className="input-field" 
+                  />
                 </div>
 
                 <div className="form-group">
@@ -518,8 +603,24 @@ const Admin = () => {
                   </select>
                 </div>
 
+                {/* CANAL DE VENTA */}
+                <div className="form-group" style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 700, color: '#fff' }}>
+                    <input
+                      type="checkbox"
+                      checked={editingId ? (editForm.availableOnline !== false) : Boolean(newProduct.availableOnline)}
+                      onChange={(e) => editingId ? setEditForm({...editForm, availableOnline: e.target.checked}) : setNewProduct({...newProduct, availableOnline: e.target.checked})}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#38bdf8' }}
+                    />
+                    <span>🌐 Publicar en Tienda Web (Catálogo Clientes)</span>
+                  </label>
+                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.35rem', display: 'block', marginLeft: '1.6rem' }}>
+                    Si lo desmarcas, se guardará como 🏬 <strong>Solo Tienda Física</strong> (no se exhibirá en la página web y no requiere foto obligatoria).
+                  </small>
+                </div>
+
                 <div className="form-group">
-                  <label>📸 Foto de la Prenda (Tomar con celular o elegir archivo)</label>
+                  <label>📸 Foto de la Prenda {(editingId ? editForm.availableOnline : newProduct.availableOnline) ? '(Recomendada para la web)' : '(Opcional para tienda física)'}</label>
                   <input 
                     type="file" 
                     accept="image/*"
@@ -532,6 +633,17 @@ const Admin = () => {
                       ✓ Foto seleccionada: {imageFile.name}
                     </div>
                   )}
+                </div>
+
+                <div className="form-group">
+                  <label>Descripción o Notas (Opcional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej. Algodón 100%, corte regular" 
+                    value={editingId ? (editForm.description || '') : (newProduct.description || '')} 
+                    onChange={(e) => editingId ? setEditForm({...editForm, description: e.target.value}) : setNewProduct({...newProduct, description: e.target.value})} 
+                    className="input-field" 
+                  />
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
@@ -567,8 +679,23 @@ const Admin = () => {
                     )}
                     <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
                       <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-                        ${p.price} | Stock: {p.stock} | SKU: {p.code || p.sku || 'N/A'} | <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                        <span>${p.price}</span> | <span>Stock: {p.stock}</span> | <span>SKU: {p.code || p.sku || 'N/A'}</span>
+                        {p.size && (
+                          <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                            Talla: {p.size}
+                          </span>
+                        )}
+                        <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
+                        {p.availableOnline === false ? (
+                          <span style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.35)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            🏬 Solo Tienda
+                          </span>
+                        ) : (
+                          <span style={{ backgroundColor: 'rgba(52, 211, 153, 0.15)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.35)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            🌐 En Web
+                          </span>
+                        )}
                       </div>
                       {(p.createdByName || p.createdBy) && (
                         <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '3px' }}>
@@ -576,7 +703,18 @@ const Admin = () => {
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: '5px' }}>
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {p.availableOnline === false && (
+                        <button
+                          type="button"
+                          onClick={() => setPromotingProduct(p)}
+                          className="btn btn-sm"
+                          title="Tomar foto y publicar en la tienda web"
+                          style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)' }}
+                        >
+                          📸 Publicar Web
+                        </button>
+                      )}
                       <button 
                         type="button" 
                         onClick={() => setSelectedBarcodeProduct(p)} 
@@ -737,6 +875,97 @@ const Admin = () => {
           products={products} 
           onClose={() => setShowBatchModal(false)} 
         />
+      )}
+
+      {/* MODAL DE ALTA RÁPIDA DE PRENDAS (PC Y CELULAR) */}
+      {showQuickEntryModal && (
+        <QuickProductEntryModal
+          isOpen={showQuickEntryModal}
+          onClose={() => setShowQuickEntryModal(false)}
+          categories={categories}
+          onProductSaved={() => fetchProducts()}
+        />
+      )}
+
+      {/* MODAL PARA PROMOVER PRENDA "SOLO TIENDA" A LA TIENDA WEB */}
+      {promotingProduct && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '460px',
+            padding: '1.5rem',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+          }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#38bdf8', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              📸 Publicar en Tienda Web
+            </h3>
+            <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#94a3b8' }}>
+              Publica <strong>"{promotingProduct.name}"</strong> (SKU: {promotingProduct.code || promotingProduct.sku}) en el catálogo online para que tus clientes puedan comprarla.
+            </p>
+
+            <form onSubmit={handleConfirmPromote}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.35rem' }}>
+                  Foto de la Prenda:
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => setPromoteImageFile(e.target.files[0])}
+                  className="input-field"
+                  style={{ padding: '0.6rem' }}
+                />
+                {promoteImageFile && (
+                  <div style={{ marginTop: '0.35rem', color: '#34d399', fontSize: '0.8rem' }}>
+                    ✓ Foto seleccionada: {promoteImageFile.name}
+                  </div>
+                )}
+                <small style={{ color: '#94a3b8', fontSize: '0.72rem', display: 'block', marginTop: '0.35rem' }}>
+                  Si no seleccionas foto nueva, se usará el logotipo de la tienda.
+                </small>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromotingProduct(null);
+                    setPromoteImageFile(null);
+                  }}
+                  className="btn"
+                  style={{ flex: 1, backgroundColor: '#334155', color: '#fff' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPromoting}
+                  className="btn btn-primary"
+                  style={{ flex: 1.5, backgroundColor: '#10b981', color: '#0f172a', fontWeight: 700 }}
+                >
+                  {isPromoting ? 'Publicando...' : '✓ Publicar en Web'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );

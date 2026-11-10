@@ -23,7 +23,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // CONFIGURACIÓN: Todos pueden leer, solo Administradores pueden modificar
+    // CONFIGURACIÓN DE CONTADORES: Personal autenticado puede incrementar contadores de folios y SKUs
+    match /config/counters {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // OTRAS CONFIGURACIONES: Todos pueden leer, solo Administradores pueden modificar
     match /config/{document=**} {
       allow read: if true;
       allow write: if isAdmin();

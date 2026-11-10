@@ -125,26 +125,40 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
 * **Persistencia de Checklist:** El estado de las prendas empacadas se conserva en `localStorage` (`alina_picked_orders`) para que no se pierda al recargar la app.
 * **SKU en el Ticket Impreso:** Al presionar "Imprimir Ticket", cada partida incluye su SKU impreso para control del repartidor / mandadito.
 
-### F. Generador de Hojas de Etiquetas Adhesivas en Lote (Flujo en 2 Fases)
+### F. Generador de Hojas de Etiquetas Adhesivas y Pre-etiquetado en Lote
 Diseñado para eliminar el desperdicio de hojas carta de stickers (Avery / Janel) y agilizar la operación en tienda:
-* **Flujo Operativo en 2 Fases:**
-  - **Fase 1 (Móvil):** El usuario o empleado usa su celular para capturar prendas con la cámara al momento de desempaquetar la mercancía. Se registran nombre, precio, stock y foto. El SKU es 100% automático.
-  - **Fase 2 (Computadora):** En la computadora conectada a la impresora estándar, se abre el modal **"🏷️ Imprimir Hoja de Etiquetas"** (disponible en POS y Admin).
-* **Control de Inventario y Bandeja Inteligente de Pendientes:**
-  - **Campo `labeled` en Firestore:** Al crear una prenda nueva desde el celular o computadora, nace automáticamente con `labeled: false`.
-  - **Pestaña por Defecto `⏳ Pendientes`:** Al abrir el generador de etiquetas, solo muestra las prendas recién dadas de alta que aún no han sido etiquetadas, seleccionándolas todas automáticamente para imprimir en 1 clic.
-  - **Pestaña `📦 Todas` y `✓ Listas`:** Permite buscar y reimprimir etiquetas de prendas antiguas del catálogo cuando sea necesario.
-  - **Banner Interactivo Post-Impresión:** Al terminar de imprimir con `window.print()`, aparece un banner interactivo que pregunta: *“¿Se imprimieron bien tus etiquetas? [ ✅ Sí, marcar como etiquetadas ]”*, actualizando Firestore atómicamente con `writeBatch` y limpiando la bandeja de pendientes.
-  - **Marcación Manual y Reversión:** Botón en barra lateral para marcar seleccionadas como etiquetadas o regresarlas a pendientes con 1 solo clic.
-* **Formatos de Hoja y Calibración Milimétrica Exacta:**
-  - **24 Etiquetas por Hoja (3 columnas x 8 filas):** Formato ultra-compacto y seguro con `gridAutoRows: 24mm` (gap `1mm 2mm`), padding `4mm 4mm` y `alignContent: 'start'`. Cada etiqueta mide `24mm` de alto con código de barras de `15px` (`width: 1.2`), texto ALINA en `7px`, nombre en `8.5px` y precio en `10px`. 5 filas de etiquetas ocupan solo ~125 mm de alto (menos de la mitad de la hoja Carta de 279.4 mm), garantizando que quepan en 1 sola hoja de papel incluso con márgenes amplios del controlador de impresora.
-  - **30 Etiquetas por Hoja (3 columnas x 10 filas):** Formato de `gridAutoRows: 20mm`.
-  - **CSS `@page` de Nivel Raíz:** `@page { size: letter portrait; margin: 0mm; }` declarado en la raíz del CSS y dentro de `@media print`, junto con reseteo de `html, body { margin: 0; padding: 0; }`.
-* **Multiplicador por Stock (`Copias x Stock`):** Un botón que asigna automáticamente a cada prenda tantas etiquetas como piezas de stock tenga registrado (ej. 3 playeras = 3 stickers iguales).
-* **Ahorro de Hojas Empezadas (`¿Hoja empezada? Iniciar en posición #X`):** Permite indicar desde qué celda empezar a imprimir (ej. iniciar en la etiqueta #5), dejando vacíos los espacios de stickers ya gastados anteriormente para no tirar ninguna hoja incompleta.
-* **Impresión Directa (`window.print` con `@media print`):** Formateada a tamaño carta (`@page { size: letter portrait }`) para que coincida exactamente con los troqueles adhesivos comerciales.
+* **Modo 1: Pre-impresión de Códigos Consecutivos Libres (`⚡ Pre-imprimir Códigos`):**
+  - Permite imprimir paquetes de 24, 48, 72, 96, 100 o más etiquetas de códigos de barra antes de registrar las prendas.
+  - Utiliza un contador atómico en Firestore (`config/counters` -> `skuSequence`) que garantiza que los códigos sean **estrictamente consecutivos e irrepetibles** (ej. `ALN-01001` al `ALN-01100`).
+  - Las etiquetas se imprimen con formato para troqueles de ropa: Logo ALINA, código Code128, SKU legible y línea guía discreta `TALLA: ____  $______`.
+  - El personal pega físicamente los stickers a las prendas en los percheros/cajas.
+* **Modo 2: Etiquetas de Prendas Existentes (`📦 Prendas Registradas`):**
+  - Bandeja inteligente con filtro por `⏳ Pendientes`, `📦 Todas` y `✓ Listas`.
+  - Banner interactivo post-impresión: *“¿Se imprimieron bien tus etiquetas? [ ✅ Sí, marcar como etiquetadas ]”* con `writeBatch`.
+* **Formatos de Hoja y Calibración Milimétrica:**
+  - 24 etiquetas por hoja (3x8 de 24mm) y 30 por hoja (3x10 de 20mm).
+  - Selector de posición inicial para hojas empezadas (*"¿Hoja empezada? Iniciar en celda #X"*).
 
-### G. Modo de Escritorio Local (`Iniciar-POS.bat`)
+### G. Sistema de Alta Rápida de Inventario (Flujo Diferenciado PC vs Celular)
+Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs tienda en línea:
+* **💻 Modo PC (Pistola de Códigos / Exclusivo Tienda Física / Rápido sin Foto):**
+  - Diseñado para teclado y pistola lectora de códigos de barra.
+  - Al tomar la prenda con el sticker ya pegado, se da el **pistolazo al código** (el cursor detecta el código y llena el campo SKU).
+  - Valida en tiempo real si el SKU ya existe en Firestore o si es nuevo disponible.
+  - Captura en segundos: **Nombre**, **Talla** (botones rápidos `CH`, `M`, `G`, `XL`, `Uni` + libre), **Categoría**, **Precio**, **Stock** y **Descripción**.
+  - **Sin foto obligatoria:** Nace con `availableOnline: false` (o switch a elección).
+  - **Comportamiento:** Se guarda al instante, suena tono de confirmación, se limpia el formulario y el cursor regresa al campo de código para la siguiente prenda sin tocar el ratón. Queda disponible de inmediato en caja POS pero **NO se publica en la web de clientes**.
+* **📱 Modo Celular (Cámara Web + Foto para Tienda Web):**
+  - Integra lector de código de barras móvil con cámara trasera (`html5-qrcode` en `CameraBarcodeScanner.jsx`).
+  - Botón directo para tomar la foto con la cámara del celular (`capture="environment"`).
+  - Nace con `availableOnline: true` (se publica en catálogo web con foto y queda disponible en POS).
+* **🔄 Promover a Web en 1 Clic:**
+  - En la lista de inventario de Admin y POS, las prendas tienen insignias visibles: `🏬 Solo Tienda` vs `🌐 En Web`.
+  - Cualquier prenda de "Solo Tienda" cuenta con un botón **"📸 Publicar en Web"** para tomarle foto cuando se desee y activarla en el catálogo en línea.
+* **Filtro Seguro de Catálogo:**
+  - `Catalog.jsx` y `Home.jsx` filtran automáticamente cualquier artículo con `availableOnline === false`, evitando que clientes pidan prendas de exhibición física exclusiva.
+
+### H. Modo de Escritorio Local (`Iniciar-POS.bat`)
 * El encargado de caja solo hace doble clic en `Iniciar-POS.bat`.
 * Levanta `server.cjs` en segundo plano en el puerto `4500`.
 * Abre Google Chrome o Microsoft Edge en modo aplicación (`--app="http://localhost:4500/pos"`), luciendo como una aplicación nativa sin barra de direcciones.

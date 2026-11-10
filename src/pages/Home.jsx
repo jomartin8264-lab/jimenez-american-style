@@ -15,8 +15,8 @@ const Home = () => {
     description: 'Descubre nuestra selección exclusiva de ropa americana. Calidad premium, diseños modernos y piezas únicas de lookbook para cada ocasión.'
   });
 
-  // Mostrar los primeros 4 productos en la sección "Lo Más Nuevo"
-  const recentProducts = products.slice(0, 4);
+  // Mostrar los primeros 4 productos en la sección "Lo Más Nuevo" (solo los publicados en web)
+  const recentProducts = products.filter(p => p.availableOnline !== false).slice(0, 4);
 
   return (
     <>

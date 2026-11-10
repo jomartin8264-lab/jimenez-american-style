@@ -32,6 +32,9 @@ const Catalog = () => {
   }, []);
 
   const filteredProducts = products.filter(product => {
+    // Si la prenda fue registrada como exclusiva para tienda física, no mostrar en la web
+    if (product.availableOnline === false) return false;
+
     const q = searchTerm.toLowerCase();
     const matchesSearch = product.name?.toLowerCase().includes(q) || 
                           (product.code && product.code.toLowerCase().includes(q)) ||

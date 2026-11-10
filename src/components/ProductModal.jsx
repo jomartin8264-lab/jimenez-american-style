@@ -59,6 +59,16 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                 </div>
               </div>
 
+              {product.size && (
+                <div className="meta-item">
+                  <span className="meta-icon" style={{ fontSize: '14px', fontWeight: 'bold' }}>📏</span>
+                  <div>
+                    <span className="meta-label">Talla</span>
+                    <span className="meta-value" style={{ fontWeight: 700, color: '#38bdf8' }}>{product.size}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="meta-item">
                 <Layers size={16} className="meta-icon" />
                 <div>
@@ -84,8 +94,11 @@ const ProductModal = ({ product, isOpen, onClose }) => {
             <div className="modal-description">
               <h3>Descripción</h3>
               <p>
-                Prenda americana de calidad premium, seleccionada y sanitizada cuidadosamente. 
-                Nuestras piezas son de edición limitada para asegurar la exclusividad de tu estilo.
+                {product.description && product.description.trim() ? (
+                  product.description
+                ) : (
+                  'Prenda americana de calidad premium, seleccionada y sanitizada cuidadosamente. Nuestras piezas son de edición limitada para asegurar la exclusividad de tu estilo.'
+                )}
               </p>
             </div>
 
