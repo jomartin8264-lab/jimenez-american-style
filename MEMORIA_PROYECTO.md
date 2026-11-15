@@ -93,15 +93,15 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
    * **Acceso Total:** Panel de administración (`/admin`), Punto de Venta (`/pos`), catálogo y reportes.
    * **Eliminación Segura:** Únicos autorizados para eliminar artículos del inventario y para eliminar registros de ventas de mostrador o pedidos web.
    * **Gestión de Personal:** Pestaña exclusiva `Control de Usuarios` en el POS para añadir nuevos empleados o administradores, cambiar roles con un solo clic o revocar accesos.
-   * **Configuración del Negocio:** Modificación de datos de empresa, teléfono de WhatsApp, llaves de API (Telegram / ImgBB) y formato de tickets.
+   * **Pestaña de Configuración Centralizada:** Nueva pestaña `⚙️ Configuración` en el POS que centraliza Categorías Dinámicas, Empresa y Contacto, llaves de API (Telegram / ImgBB) y Admins Autorizados (eliminadas de `/admin` para mantenerlo limpio y operativo).
    * **Protección Master:** La cuenta raíz `jomartin8264@gmail.com` está blindada contra revocación accidental de rol o eliminación.
 
 2. **👔 Empleados (Cajeros / Personal de Tienda):**
    * **Ventas en Mostrador:** Cobro rápido, selección de método de pago, aplicación de descuentos y emisión de tickets.
-   * **Alta de Prendas desde el Celular:** Pueden ingresar a `/admin` desde su smartphone para tomar fotos y publicar nuevas prendas. El SKU/Código de barras es **100% automático**.
+   * **Alta de Prendas desde el Celular o PC:** Pueden ingresar a `/admin` o usar `⚡ Alta Rápida`. El SKU/Código de barras es automático o validado.
    * **Auditoría y Trazabilidad:** Cada prenda registrada almacena automáticamente los campos `createdBy` (correo) y `createdByName` (nombre o alias del usuario), mostrándose claramente en las tarjetas de inventario y en el POS (`👤 Alta por: [Nombre]`).
    * **Pedidos Web y Reimpresión:** Pueden consultar pedidos recibidos por la web, imprimir sus tickets para empaque y buscar folios de tickets para reimpresión.
-   * **Restricciones Estrictas:** No pueden eliminar prendas, no pueden eliminar ventas ni pedidos, no tienen acceso a la pestaña de usuarios ni a las configuraciones sensibles del sistema.
+   * **Restricciones Estrictas:** No pueden eliminar prendas, no pueden eliminar ventas ni pedidos, no tienen acceso a las pestañas de usuarios ni de configuración.
 
 ### C. Sistema de Folios, Búsqueda y Reimpresión de Tickets
 * **Folios Únicos Oficiales:**
@@ -111,9 +111,9 @@ El sistema cuenta con una arquitectura de control de acceso basada en roles sinc
 * **Reimpresión Flexible:** Reimprime cualquier ticket pasado con opción de editar notas o datos de cliente antes de imprimir.
 * **Edición en Caja:** Permite agregar conceptos manuales libres al ticket (arreglos, extras) y editar el precio de una prenda en mostrador antes de cobrar.
 
-### D. Tienda Web y Administración Móvil
-* **Captura Rápida desde Celular:** El usuario solo ingresa nombre, precio, stock, categoría y foto. El SKU/Código de barras es **100% automático** generado por el sistema sin intervención manual.
-* Catálogo dinámico conectado a la misma colección de productos en Firestore.
+### D. Tienda Web y Seguridad de Carrito
+* **Autenticación Obligatoria para Comprar:** Los botones "Agregar al carrito" en catálogo y modal de detalle verifican sesión activa. Si el usuario no ha iniciado sesión, es redirigido inmediatamente a `/login`.
+* Catálogo dinámico conectado a la misma colección de productos en Firestore con exclusión automática de prendas `availableOnline: false`.
 * Carrito de compras reactivo con persistencia en `localStorage`.
 * Pedido estructurado exportable a mensaje directo de WhatsApp.
 
@@ -135,12 +135,15 @@ Diseñado para eliminar el desperdicio de hojas carta de stickers (Avery / Janel
 * **Modo 2: Etiquetas de Prendas Existentes (`📦 Prendas Registradas`):**
   - Bandeja inteligente con filtro por `⏳ Pendientes`, `📦 Todas` y `✓ Listas`.
   - Banner interactivo post-impresión: *“¿Se imprimieron bien tus etiquetas? [ ✅ Sí, marcar como etiquetadas ]”* con `writeBatch`.
-* **Formatos de Hoja y Calibración Milimétrica:**
-  - 24 etiquetas por hoja (3x8 de 24mm) y 30 por hoja (3x10 de 20mm).
+* **Calibración Milimétrica para 1 Hoja Carta Exacta:**
+  - Formato de 24 etiquetas por hoja bloqueado exactamente a 8 filas fijas de **32.5mm** (medida estándar de plantillas 3x8 Janel/Avery).
+  - Hoja delimitada a **272mm** de alto con `overflow: hidden`, impidiendo que se desborden filas a una segunda página.
   - Selector de posición inicial para hojas empezadas (*"¿Hoja empezada? Iniciar en celda #X"*).
 
-### G. Sistema de Alta Rápida de Inventario (Flujo Diferenciado PC vs Celular)
+### G. Sistema de Alta Rápida y Blindaje contra Duplicados
 Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs tienda en línea:
+* **🚫 Bloqueo Estricto de Duplicados:** Al escanear o escribir un SKU que ya existe en Firestore, el sistema muestra una alerta roja destacada, desactiva y bloquea el botón de guardar (`⛔ Código Duplicado (Bloqueado)`), e impide el envío tanto por clic como por tecla Enter. Doble verificación en Firestore antes de escribir.
+* **📸 Doble Opción de Imagen:** En alta rápida, en el formulario admin y al promover a web, se ofrecen dos botones separados: **"📸 Tomar Foto"** (cámara directa del celular) y **"🖼️ Elegir de Galería"** (fotos previas o archivos de PC).
 * **💻 Modo PC (Pistola de Códigos / Exclusivo Tienda Física / Rápido sin Foto):**
   - Diseñado para teclado y pistola lectora de códigos de barra.
   - Al tomar la prenda con el sticker ya pegado, se da el **pistolazo al código** (el cursor detecta el código y llena el campo SKU).
@@ -150,11 +153,10 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   - **Comportamiento:** Se guarda al instante, suena tono de confirmación, se limpia el formulario y el cursor regresa al campo de código para la siguiente prenda sin tocar el ratón. Queda disponible de inmediato en caja POS pero **NO se publica en la web de clientes**.
 * **📱 Modo Celular (Cámara Web + Foto para Tienda Web):**
   - Integra lector de código de barras móvil con cámara trasera (`html5-qrcode` en `CameraBarcodeScanner.jsx`).
-  - Botón directo para tomar la foto con la cámara del celular (`capture="environment"`).
   - Nace con `availableOnline: true` (se publica en catálogo web con foto y queda disponible en POS).
 * **🔄 Promover a Web en 1 Clic:**
   - En la lista de inventario de Admin y POS, las prendas tienen insignias visibles: `🏬 Solo Tienda` vs `🌐 En Web`.
-  - Cualquier prenda de "Solo Tienda" cuenta con un botón **"📸 Publicar en Web"** para tomarle foto cuando se desee y activarla en el catálogo en línea.
+  - Cualquier prenda de "Solo Tienda" cuenta con un botón **"📸 Publicar en Web"** para tomarle foto o subirla de galería y activarla en el catálogo en línea.
 * **Filtro Seguro de Catálogo:**
   - `Catalog.jsx` y `Home.jsx` filtran automáticamente cualquier artículo con `availableOnline === false`, evitando que clientes pidan prendas de exhibición física exclusiva.
 
