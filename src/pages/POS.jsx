@@ -897,8 +897,11 @@ export default function POS() {
     }
   };
 
-  // Filtrado de productos en mostrador
+  // Filtrado de productos en mostrador (solo artículos con existencias disponibles)
   const filteredProducts = products.filter(p => {
+    const rawStock = (p.stock === null || p.stock === undefined || isNaN(Number(p.stock))) ? 0 : Number(p.stock);
+    if (rawStock <= 0) return false;
+
     const matchesCat = selectedCat === 'Todos' || p.category === selectedCat;
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q || 
@@ -1178,7 +1181,16 @@ export default function POS() {
 
             {/* Grilla de Prendas */}
             <div className="pos-products-grid">
-              {filteredProducts.map(p => {
+              {filteredProducts.length === 0 ? (
+                <div style={{ gridColumn: '1 / -1', padding: '3rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                  <Package size={40} style={{ opacity: 0.4, marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, fontSize: '0.95rem' }}>No hay prendas con existencias disponibles en esta vista.</p>
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.8rem', color: '#475569' }}>
+                    Puedes consultar el almacén o reponer existencias en la pestaña <strong>📦 Inventario</strong>.
+                  </p>
+                </div>
+              ) : (
+                filteredProducts.map(p => {
                 const isOutOfStock = p.stock <= 0;
                 let badgeClass = 'good';
                 if (isOutOfStock) badgeClass = 'empty';
@@ -1256,7 +1268,7 @@ export default function POS() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </section>
 

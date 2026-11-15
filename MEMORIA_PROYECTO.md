@@ -196,6 +196,11 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * Se eliminó el letrero flotante **"¡Últimas X!"** que aparecía sobre las fotografías de las prendas en el catálogo. Al tratarse de pacas de ropa americana de piezas únicas (stock = 1), el letrero tapaba las fotos y era redundante.
 * Las fotos de las prendas ahora se muestran 100% limpias. En el pie de la tarjeta y modal de detalles se indica discretamente **"Pieza única"** cuando hay 1 disponible, o **"Agotado"** si se vendió.
 
+### O. Ocultamiento Automático de Artículos Agotados en Web y Mostrador
+* **Catálogo Web (`Catalog.jsx`, `Home.jsx`):** Cualquier artículo con `stock <= 0` (o inválido) es excluido automáticamente de la vista de los clientes. Solo se exhiben prendas con existencias reales.
+* **Mostrador POS (`POS.jsx`):** La cuadrícula de cobro rápido de mostrador filtra automáticamente las prendas agotadas para evitar selecciones de prendas inexistentes.
+* **Reactivación Automática desde Inventario:** En la pestaña **`📦 Inventario`** del POS y en `/admin`, todos los productos agotados siguen visibles y filtrables. En cuanto el encargado pulsa `[+]` o edita el stock a 1 o más, la prenda reaparece de inmediato tanto en el mostrador de caja como en la página web pública en tiempo real sin recargar.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

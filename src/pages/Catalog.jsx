@@ -35,6 +35,10 @@ const Catalog = () => {
     // Si la prenda fue registrada como exclusiva para tienda física, no mostrar en la web
     if (product.availableOnline === false) return false;
 
+    // Si la prenda está agotada (stock <= 0 o inválido), no mostrar en la web
+    const stockNum = Number(product.stock);
+    if (isNaN(stockNum) || stockNum <= 0) return false;
+
     const q = searchTerm.toLowerCase();
     const matchesSearch = product.name?.toLowerCase().includes(q) || 
                           (product.code && product.code.toLowerCase().includes(q)) ||
