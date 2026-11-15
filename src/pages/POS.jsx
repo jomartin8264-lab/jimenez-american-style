@@ -122,6 +122,18 @@ export default function POS() {
   const [newStaffRole, setNewStaffRole] = useState('employee');
   const [adminEmails, setAdminEmails] = useState(['jomartin8264@gmail.com']);
 
+  // Configuración del Sistema (movida desde Admin)
+  const [configCategories, setConfigCategories] = useState([]);
+  const [newCatName, setNewCatName] = useState('');
+  const [storeInfo, setStoreInfo] = useState({ description: '', address: '', phone: '' });
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [savingApi, setSavingApi] = useState(false);
+  const [apiSettings, setApiSettings] = useState({
+    telegramToken: '',
+    telegramChatId: '',
+    imgbbApiKey: ''
+  });
+
   // Reloj en tiempo real
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
 
@@ -207,6 +219,35 @@ export default function POS() {
         } catch (e) {
           console.warn("Ajustes locales del ticket cargados.");
         }
+
+        // Cargar datos de configuración del sistema (categorías, empresa, APIs)
+        try {
+          const catSnap = await getDoc(doc(db, "config", "categories"));
+          if (catSnap.exists()) {
+            setConfigCategories(catSnap.data().list || []);
+          } else {
+            const initial = ['Dama', 'Caballero', 'Niños', 'Accesorios', 'Otros'];
+            await setDoc(doc(db, "config", "categories"), { list: initial });
+            setConfigCategories(initial);
+          }
+        } catch (e) { console.warn("Error cargando categorías:", e); }
+
+        try {
+          const storeSnap2 = await getDoc(doc(db, "config", "storeInfo"));
+          if (storeSnap2.exists()) setStoreInfo(storeSnap2.data());
+        } catch (e) { console.warn("Error cargando storeInfo:", e); }
+
+        try {
+          const apiSnap = await getDoc(doc(db, "config", "apiSettings"));
+          if (apiSnap.exists()) {
+            const d = apiSnap.data();
+            setApiSettings({
+              telegramToken: d.telegramToken || '',
+              telegramChatId: d.telegramChatId || '',
+              imgbbApiKey: d.imgbbApiKey || ''
+            });
+          }
+        } catch (e) { console.warn("Error cargando apiSettings:", e); }
       } catch (err) {
         console.error("Error verificando permisos:", err);
       } finally {
@@ -318,6 +359,46 @@ export default function POS() {
       console.error(err);
       alert("Error al revocar permiso: " + err.message);
     }
+  };
+
+  // Handlers de Configuración del Sistema
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    const updated = [...configCategories, newCatName.trim()];
+    try {
+      await setDoc(doc(db, "config", "categories"), { list: updated });
+      setConfigCategories(updated);
+      setNewCatName('');
+    } catch (err) { alert("Error al guardar categoría"); }
+  };
+
+  const handleRemoveCategory = async (cat) => {
+    if (configCategories.length <= 1) return alert("Debes tener al menos una categoría.");
+    if (!window.confirm(`¿Eliminar la categoría "${cat}"?`)) return;
+    const updated = configCategories.filter(c => c !== cat);
+    await setDoc(doc(db, "config", "categories"), { list: updated });
+    setConfigCategories(updated);
+  };
+
+  const handleSaveStoreInfo = async (e) => {
+    e.preventDefault();
+    setSavingInfo(true);
+    await setDoc(doc(db, "config", "storeInfo"), storeInfo, { merge: true });
+    alert("Contacto actualizado");
+    setSavingInfo(false);
+  };
+
+  const handleSaveApiSettings = async (e) => {
+    e.preventDefault();
+    setSavingApi(true);
+    try {
+      await setDoc(doc(db, "config", "apiSettings"), apiSettings, { merge: true });
+      alert("Configuración de APIs actualizada correctamente.");
+    } catch (err) {
+      alert("Error al guardar la configuración de APIs.");
+    }
+    setSavingApi(false);
   };
 
   // Eliminar prenda (Solo Administradores)
@@ -857,6 +938,14 @@ export default function POS() {
               onClick={() => setActiveTab('team')}
             >
               <Users size={18} /> Control de Usuarios
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className={`pos-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+              onClick={() => setActiveTab('config')}
+            >
+              <Settings size={18} /> Configuración
             </button>
           )}
         </div>
@@ -2018,6 +2107,128 @@ export default function POS() {
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA: CONFIGURACIÓN DEL SISTEMA */}
+      {activeTab === 'config' && isAdmin && (
+        <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+          <div style={{ maxWidth: '750px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+            <h2 style={{ margin: '0 0 0.25rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Settings size={28} /> Configuración del Sistema
+            </h2>
+
+            {/* CATEGORÍAS DINÁMICAS */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🏷️ Categorías Dinámicas
+              </h3>
+              <form onSubmit={handleAddCategory} style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  className="pos-input-sm"
+                  style={{ flex: 1, padding: '0.6rem 0.85rem' }}
+                  placeholder="Nueva categoría..."
+                />
+                <button type="submit" className="pos-btn" style={{ background: '#38bdf8', color: '#0f172a', fontWeight: 700, border: 'none', borderRadius: '6px', padding: '0.6rem 1.2rem', cursor: 'pointer' }}>
+                  Añadir
+                </button>
+              </form>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {configCategories.map(c => (
+                  <span key={c} style={{ padding: '0.3rem 0.9rem', border: '1px solid #334155', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#0f172a', fontSize: '0.85rem' }}>
+                    {c}
+                    <b onClick={() => handleRemoveCategory(c)} style={{ color: '#ef4444', cursor: 'pointer', fontWeight: 900, lineHeight: 1 }}>×</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* EMPRESA Y CONTACTO */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>🏪 Empresa y Contacto</h3>
+              <form onSubmit={handleSaveStoreInfo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Descripción de Nosotros</label>
+                  <textarea
+                    value={storeInfo.description || ''}
+                    onChange={(e) => setStoreInfo({ ...storeInfo, description: e.target.value })}
+                    className="pos-input-sm"
+                    rows={3}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', resize: 'vertical' }}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Dirección</label>
+                    <input type="text" value={storeInfo.address || ''} onChange={(e) => setStoreInfo({ ...storeInfo, address: e.target.value })} className="pos-input-sm" style={{ width: '100%', padding: '0.6rem 0.85rem' }} placeholder="Dirección física" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Teléfono (WhatsApp)</label>
+                    <input type="text" value={storeInfo.phone || ''} onChange={(e) => setStoreInfo({ ...storeInfo, phone: e.target.value })} className="pos-input-sm" style={{ width: '100%', padding: '0.6rem 0.85rem' }} placeholder="10 dígitos" />
+                  </div>
+                </div>
+                <button disabled={savingInfo} type="submit" style={{ alignSelf: 'flex-start', background: '#38bdf8', color: '#0f172a', fontWeight: 700, border: 'none', borderRadius: '6px', padding: '0.65rem 1.5rem', cursor: 'pointer' }}>
+                  {savingInfo ? 'Guardando...' : 'Actualizar'}
+                </button>
+              </form>
+            </div>
+
+            {/* APIs Y CANALES */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>🔧 Configuración del Sistema (APIs y Canales)</h3>
+              <form onSubmit={handleSaveApiSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Telegram Bot Token</label>
+                  <input type="text" value={apiSettings.telegramToken} onChange={(e) => setApiSettings({ ...apiSettings, telegramToken: e.target.value })} className="pos-input-sm" style={{ width: '100%', padding: '0.6rem 0.85rem', fontFamily: 'monospace' }} placeholder="Bot Token" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Telegram Chat ID</label>
+                  <input type="text" value={apiSettings.telegramChatId} onChange={(e) => setApiSettings({ ...apiSettings, telegramChatId: e.target.value })} className="pos-input-sm" style={{ width: '100%', padding: '0.6rem 0.85rem', fontFamily: 'monospace' }} placeholder="Chat ID" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>ImgBB API Key (Subida de Imágenes)</label>
+                  <input type="text" value={apiSettings.imgbbApiKey} onChange={(e) => setApiSettings({ ...apiSettings, imgbbApiKey: e.target.value })} className="pos-input-sm" style={{ width: '100%', padding: '0.6rem 0.85rem', fontFamily: 'monospace' }} placeholder="API Key de ImgBB" />
+                </div>
+                <button disabled={savingApi} type="submit" style={{ alignSelf: 'flex-start', background: '#38bdf8', color: '#0f172a', fontWeight: 700, border: 'none', borderRadius: '6px', padding: '0.65rem 1.5rem', cursor: 'pointer' }}>
+                  {savingApi ? 'Guardando...' : 'Actualizar Llaves'}
+                </button>
+              </form>
+            </div>
+
+            {/* ADMINS AUTORIZADOS */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>👑 Admins Autorizados</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {adminEmails.map(email => (
+                  <span key={email} style={{ padding: '0.3rem 0.9rem', border: '1px solid rgba(251,191,36,0.4)', borderRadius: '20px', background: 'rgba(251,191,36,0.08)', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                    {email}
+                    {email !== 'jomartin8264@gmail.com' && (
+                      <b
+                        onClick={async () => {
+                          if (!window.confirm(`¿Revocar admin a ${email}?`)) return;
+                          const updated = adminEmails.filter(e => e !== email);
+                          await setDoc(doc(db, "config", "admins"), { emails: updated });
+                          setAdminEmails(updated);
+                          const updatedStaff = staffUsers.map(u => u.email.toLowerCase() === email.toLowerCase() ? { ...u, role: 'employee' } : u);
+                          await setDoc(doc(db, "config", "staff"), { users: updatedStaff });
+                          setStaffUsers(updatedStaff);
+                        }}
+                        style={{ color: '#ef4444', cursor: 'pointer', fontWeight: 900 }}
+                      >×</b>
+                    )}
+                  </span>
+                ))}
+              </div>
+              <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                Para añadir o cambiar administradores ve a la pestaña <strong>Control de Usuarios</strong>.
+              </p>
+            </div>
+
           </div>
         </div>
       )}
