@@ -34,7 +34,11 @@ export function CartProvider({ children }) {
 
   // Recalculate total whenever cart changes and save to local
   useEffect(() => {
-    const total = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const total = cartItems.reduce((acc, item) => {
+      const q = Math.max(1, parseInt(item.quantity, 10) || 1);
+      const p = Number(item.price) || 0;
+      return acc + (p * q);
+    }, 0);
     setCartTotal(total);
     localStorage.setItem('jimenez_cart', JSON.stringify(cartItems));
   }, [cartItems]);
@@ -49,12 +53,13 @@ export function CartProvider({ children }) {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
+        const curQty = Math.max(1, parseInt(existing.quantity, 10) || 1);
         // Check if we are trying to add more than available in DB
-        if (existing.quantity >= dbProduct.stock) {
-          alert("Ya tienes todas las piezas disponibles en tu carrito.");
+        if (curQty >= dbProduct.stock) {
+          alert(`Ya tienes todas las piezas disponibles (${dbProduct.stock}) en tu carrito.`);
           return prev;
         }
-        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map(item => item.id === product.id ? { ...item, quantity: curQty + 1 } : item);
       }
       return [...prev, { ...product, quantity: 1 }];
     });
@@ -68,18 +73,28 @@ export function CartProvider({ children }) {
     const existing = cartItems.find(item => item.id === productId);
     if (!existing) return;
 
-    if (newQty <= 0) {
-      removeFromCart(productId);
+    // Si viene vacío, null o NaN, restaurar a mínimo 1
+    if (newQty === '' || newQty === null || newQty === undefined || isNaN(newQty)) {
+      setCartItems(prev => prev.map(item => item.id === productId ? { ...item, quantity: 1 } : item));
+      return;
+    }
+
+    const parsedQty = parseInt(newQty, 10);
+    if (isNaN(parsedQty) || parsedQty <= 0) {
+      setCartItems(prev => prev.map(item => item.id === productId ? { ...item, quantity: 1 } : item));
       return;
     }
     
     const dbProduct = products.find(p => p.id === productId);
-    if (newQty > (dbProduct?.stock || 0)) {
-       alert("No hay suficiente inventario disponible.");
+    const maxStock = dbProduct ? Number(dbProduct.stock) : (Number(existing.stock) || 1);
+
+    if (parsedQty > maxStock) {
+       alert(`Solo hay ${maxStock} pieza(s) disponible(s) de este artículo.`);
+       setCartItems(prev => prev.map(item => item.id === productId ? { ...item, quantity: maxStock } : item));
        return;
     }
 
-    setCartItems(prev => prev.map(item => item.id === productId ? { ...item, quantity: newQty } : item));
+    setCartItems(prev => prev.map(item => item.id === productId ? { ...item, quantity: parsedQty } : item));
   };
 
   const clearCart = () => {

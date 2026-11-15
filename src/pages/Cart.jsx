@@ -91,6 +91,21 @@ const Cart = () => {
 
       // 2.5 Guardar orden en Firestore con su folio oficial
       const webFolio = `WEB-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
+      const cleanItems = cartItems.map(item => {
+        const cleanPrice = Number(item.price) || 0;
+        const cleanQuantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+        return {
+          id: item.id,
+          name: item.name,
+          price: cleanPrice,
+          quantity: cleanQuantity,
+          code: item.code || item.sku || '',
+          sku: item.sku || item.code || '',
+          image: item.image || ''
+        };
+      });
+      const verifiedTotal = cleanItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+
       try {
         await addDoc(collection(db, "orders"), {
           folio: webFolio,
@@ -99,16 +114,8 @@ const Cart = () => {
           clientPhone: checkoutData.phone,
           clientAddress: checkoutData.address,
           clientNotes: checkoutData.notes || '',
-          items: cartItems.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: Number(item.price),
-            quantity: Number(item.quantity),
-            code: item.code || item.sku || '',
-            sku: item.sku || item.code || '',
-            image: item.image || ''
-          })),
-          total: Number(cartTotal),
+          items: cleanItems,
+          total: verifiedTotal,
           status: 'pendiente',
           type: 'web',
           createdAt: serverTimestamp(),
@@ -179,17 +186,112 @@ const Cart = () => {
                     <p style={{ color: 'var(--color-text-light)', margin: '0' }}>CÓD: {item.code}</p>
                     <p style={{ fontWeight: 'bold', margin: '0.5rem 0 0 0' }}>${item.price.toFixed(2)}</p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      max={item.stock || 10}
-                      value={item.quantity} 
-                      onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
-                      style={{ width: '60px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }}
-                    />
-                    <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: '#ff3b3b', cursor: 'pointer' }} aria-label="Eliminar del carrito">
-                      <Trash2 size={24} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    {/* Selector de cantidad con botones +/- que nunca queda vacío */}
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--color-bg)'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cur = Math.max(1, parseInt(item.quantity, 10) || 1);
+                          if (cur > 1) updateQuantity(item.id, cur - 1);
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '36px',
+                          border: 'none',
+                          background: 'none',
+                          color: 'var(--color-text)',
+                          fontSize: '1.2rem',
+                          cursor: (Number(item.quantity) || 1) <= 1 ? 'not-allowed' : 'pointer',
+                          opacity: (Number(item.quantity) || 1) <= 1 ? 0.4 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold'
+                        }}
+                        aria-label="Disminuir cantidad"
+                      >
+                        -
+                      </button>
+
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max={item.stock || 10}
+                        value={item.quantity || ''} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            // Si el usuario borra en el teclado, actualizamos el estado como vacío temporalmente
+                            // pero en context o blur se fuerza mínimo 1
+                            updateQuantity(item.id, '');
+                          } else {
+                            const parsed = parseInt(val, 10);
+                            if (!isNaN(parsed)) {
+                              updateQuantity(item.id, parsed);
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Si se sale del campo dejándolo en blanco o menor a 1, reponer 1 automáticamente
+                          if (!e.target.value || parseInt(e.target.value, 10) < 1 || isNaN(parseInt(e.target.value, 10))) {
+                            updateQuantity(item.id, 1);
+                          }
+                        }}
+                        style={{ 
+                          width: '44px', 
+                          height: '36px',
+                          textAlign: 'center',
+                          padding: '0', 
+                          border: 'none', 
+                          borderLeft: '1px solid var(--color-border)',
+                          borderRight: '1px solid var(--color-border)',
+                          backgroundColor: 'transparent', 
+                          color: 'var(--color-text)',
+                          fontWeight: 'bold',
+                          fontSize: '0.95rem'
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cur = Math.max(1, parseInt(item.quantity, 10) || 1);
+                          updateQuantity(item.id, cur + 1);
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '36px',
+                          border: 'none',
+                          background: 'none',
+                          color: 'var(--color-text)',
+                          fontSize: '1.2rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold'
+                        }}
+                        aria-label="Aumentar cantidad"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => removeFromCart(item.id)} 
+                      style={{ background: 'none', border: 'none', color: '#ff3b3b', cursor: 'pointer', padding: '0.4rem', display: 'flex', alignItems: 'center' }} 
+                      aria-label="Eliminar del carrito"
+                      title="Eliminar artículo"
+                    >
+                      <Trash2 size={22} />
                     </button>
                   </div>
                 </div>

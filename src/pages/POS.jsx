@@ -1608,7 +1608,7 @@ export default function POS() {
 
                             {/* Subtotal */}
                             <div style={{ textAlign: 'right', flexShrink: 0, fontWeight: 700, fontSize: '0.9rem', color: isPicked ? '#34d399' : '#f8fafc' }}>
-                              ${(it.price * it.quantity).toFixed(2)}
+                              ${((Number(it.price) || 0) * (Math.max(1, parseInt(it.quantity, 10) || 1))).toFixed(2)}
                             </div>
                           </div>
                         );
@@ -1617,7 +1617,9 @@ export default function POS() {
 
                     <div className="pos-order-total-bar">
                       <span>Total:</span>
-                      <span style={{ color: '#34d399' }}>${(order.total || 0).toFixed(2)} MXN</span>
+                      <span style={{ color: '#34d399' }}>
+                        ${((Number(order.total) > 0) ? Number(order.total) : (order.items || []).reduce((acc, it) => acc + ((Number(it.price) || 0) * (Math.max(1, parseInt(it.quantity, 10) || 1))), 0)).toFixed(2)} MXN
+                      </span>
                     </div>
 
                     {/* Acciones del pedido */}
