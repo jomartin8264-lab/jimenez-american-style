@@ -1200,19 +1200,22 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gridAutoRows: sheetLayout === '24' ? '24mm' : '20mm',
-                gap: sheetLayout === '24' ? '1mm 2mm' : '0.8mm 1.5mm',
+                gridTemplateRows: sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)',
+                gap: sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm',
                 boxSizing: 'border-box',
-                padding: '4mm 4mm',
+                padding: '5mm 5mm',
                 width: '100%',
                 maxWidth: '215mm',
+                height: '272mm',
+                maxHeight: '272mm',
                 margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',
                 breakInside: 'avoid',
                 pageBreakAfter: pIdx === pages.length - 1 ? 'avoid' : 'always',
                 breakAfter: pIdx === pages.length - 1 ? 'avoid' : 'page',
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                overflow: 'hidden'
               }}
             >
               {pageLabels.map((item) => {
@@ -1223,9 +1226,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       style={{ 
                         border: 'none', 
                         visibility: 'hidden',
-                        height: sheetLayout === '24' ? '24mm' : '20mm',
-                        minHeight: sheetLayout === '24' ? '24mm' : '20mm',
-                        maxHeight: sheetLayout === '24' ? '24mm' : '20mm',
+                        height: '100%',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -1237,7 +1238,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     style={{
                       border: '1px solid #111111',
                       borderRadius: '3px',
-                      padding: '1mm 1mm',
+                      padding: '1.2mm 1.5mm',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -1245,9 +1246,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       boxSizing: 'border-box',
                       overflow: 'hidden',
                       backgroundColor: '#ffffff',
-                      height: sheetLayout === '24' ? '24mm' : '20mm',
-                      minHeight: sheetLayout === '24' ? '24mm' : '20mm',
-                      maxHeight: sheetLayout === '24' ? '24mm' : '20mm',
+                      height: '100%',
+                      maxHeight: '100%',
                       color: '#000000',
                       pageBreakInside: 'avoid',
                       breakInside: 'avoid'
