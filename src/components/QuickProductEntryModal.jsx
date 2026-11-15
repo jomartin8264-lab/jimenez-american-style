@@ -4,7 +4,7 @@ import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase
 import { useAuth } from '../contexts/AuthContext';
 import { 
   X, Camera, Scan, CheckCircle2, AlertTriangle, 
-  Monitor, Smartphone, Sparkles, Tag, Plus, Check
+  Monitor, Smartphone, Sparkles, Tag, Plus, Check, Image as ImageIcon
 } from 'lucide-react';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { compressImageToBase64 } from '../utils/productImages';
@@ -73,7 +73,8 @@ export default function QuickProductEntryModal({
   const codeInputRef = useRef(null);
   const nameInputRef = useRef(null);
   const priceInputRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   // Sincronizar el canal de venta por defecto según el modo
   useEffect(() => {
@@ -162,7 +163,8 @@ export default function QuickProductEntryModal({
     setExistingProduct(null);
     setIsCustomCategory(false);
     setCustomCatName('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
 
     setTimeout(() => {
       if (entryMode === 'pc') {
@@ -742,56 +744,93 @@ export default function QuickProductEntryModal({
             {/* SECCIÓN DE FOTO: REQUERIDA O SUGERIDA SI ESTÁ EN WEB */}
             {(availableOnline || entryMode === 'mobile' || imagePreview) && (
               <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed #475569' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '0.45rem' }}>
                   📸 Foto de la Prenda {availableOnline ? '(Recomendada para la web)' : '(Opcional)'}:
                 </label>
                 
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handlePhotoSelect}
-                    style={{ display: 'none' }}
-                    id="quick-entry-camera-input"
-                  />
+                {/* Inputs ocultos para Cámara y Galería */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoSelect}
+                  style={{ display: 'none' }}
+                  id="quick-entry-camera-input"
+                />
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  style={{ display: 'none' }}
+                  id="quick-entry-gallery-input"
+                />
+
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Botón 1: Tomar foto con la cámara directa */}
                   <label
                     htmlFor="quick-entry-camera-input"
                     style={{
-                      padding: '0.6rem 1rem',
+                      padding: '0.55rem 0.95rem',
                       backgroundColor: '#0284c7',
                       color: '#fff',
                       borderRadius: '8px',
                       fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                    }}
+                  >
+                    <Camera size={16} /> Tomar Foto
+                  </label>
+
+                  {/* Botón 2: Subir foto existente desde la galería o archivos */}
+                  <label
+                    htmlFor="quick-entry-gallery-input"
+                    style={{
+                      padding: '0.55rem 0.95rem',
+                      backgroundColor: '#334155',
+                      border: '1px solid #475569',
+                      color: '#f8fafc',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.4rem'
                     }}
                   >
-                    <Camera size={16} /> {entryMode === 'mobile' ? 'Tomar Foto con Cámara' : 'Subir Imagen'}
+                    <ImageIcon size={16} color="#38bdf8" /> Elegir de Galería
                   </label>
 
+                  {/* Vista previa y opción de quitar */}
                   {imagePreview && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#0f172a', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid #38bdf8' }}>
                       <img
                         src={imagePreview}
                         alt="Preview"
-                        style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #38bdf8' }}
+                        style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '6px' }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImageFile(null);
-                          setImagePreview(null);
-                          if (fileInputRef.current) fileInputRef.current.value = '';
-                        }}
-                        style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer' }}
-                      >
-                        Quitar foto
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>✓ Foto lista</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageFile(null);
+                            setImagePreview(null);
+                            if (cameraInputRef.current) cameraInputRef.current.value = '';
+                            if (galleryInputRef.current) galleryInputRef.current.value = '';
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', padding: 0, textAlign: 'left', fontWeight: 600 }}
+                        >
+                          ✕ Quitar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

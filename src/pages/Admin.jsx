@@ -620,17 +620,54 @@ const Admin = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>📸 Foto de la Prenda {(editingId ? editForm.availableOnline : newProduct.availableOnline) ? '(Recomendada para la web)' : '(Opcional para tienda física)'}</label>
+                  <label style={{ display: 'block', marginBottom: '0.4rem' }}>
+                    📸 Foto de la Prenda {(editingId ? editForm.availableOnline : newProduct.availableOnline) ? '(Recomendada para la web)' : '(Opcional para tienda física)'}
+                  </label>
+                  
+                  {/* Inputs para Cámara y Galería */}
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => setImageFile(e.target.files[0])} 
+                    style={{ display: 'none' }}
+                    id="admin-form-camera-input"
+                  />
                   <input 
                     type="file" 
                     accept="image/*"
                     onChange={(e) => setImageFile(e.target.files[0])} 
-                    className="input-field" 
-                    style={{ padding: '0.6rem' }}
+                    style={{ display: 'none' }}
+                    id="admin-form-gallery-input"
                   />
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label
+                      htmlFor="admin-form-camera-input"
+                      className="btn btn-sm"
+                      style={{ backgroundColor: '#0284c7', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}
+                    >
+                      📸 Tomar Foto
+                    </label>
+                    <label
+                      htmlFor="admin-form-gallery-input"
+                      className="btn btn-sm"
+                      style={{ backgroundColor: '#334155', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, border: '1px solid #475569' }}
+                    >
+                      🖼️ Galería / Archivo
+                    </label>
+                  </div>
+
                   {imageFile && (
-                    <div style={{ marginTop: '0.5rem', color: '#34d399', fontSize: '0.85rem' }}>
-                      ✓ Foto seleccionada: {imageFile.name}
+                    <div style={{ marginTop: '0.5rem', color: '#34d399', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>✓ Foto seleccionada: {imageFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setImageFile(null)}
+                        style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer', marginLeft: '0.5rem' }}
+                      >
+                        (Quitar)
+                      </button>
                     </div>
                   )}
                 </div>
@@ -824,20 +861,54 @@ const Admin = () => {
 
             <form onSubmit={handleConfirmPromote}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.5rem' }}>
                   Foto de la Prenda:
                 </label>
+
+                {/* Inputs para Cámara y Galería */}
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={(e) => setPromoteImageFile(e.target.files[0])}
-                  className="input-field"
-                  style={{ padding: '0.6rem' }}
+                  style={{ display: 'none' }}
+                  id="promote-camera-input"
                 />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setPromoteImageFile(e.target.files[0])}
+                  style={{ display: 'none' }}
+                  id="promote-gallery-input"
+                />
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label
+                    htmlFor="promote-camera-input"
+                    className="btn btn-sm"
+                    style={{ backgroundColor: '#0284c7', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}
+                  >
+                    📸 Tomar Foto
+                  </label>
+                  <label
+                    htmlFor="promote-gallery-input"
+                    className="btn btn-sm"
+                    style={{ backgroundColor: '#334155', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, border: '1px solid #475569' }}
+                  >
+                    🖼️ Galería / Archivo
+                  </label>
+                </div>
+
                 {promoteImageFile && (
-                  <div style={{ marginTop: '0.35rem', color: '#34d399', fontSize: '0.8rem' }}>
-                    ✓ Foto seleccionada: {promoteImageFile.name}
+                  <div style={{ marginTop: '0.5rem', color: '#34d399', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>✓ Foto lista: {promoteImageFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPromoteImageFile(null)}
+                      style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer', marginLeft: '0.5rem' }}
+                    >
+                      (Quitar)
+                    </button>
                   </div>
                 )}
                 <small style={{ color: '#94a3b8', fontSize: '0.72rem', display: 'block', marginTop: '0.35rem' }}>
