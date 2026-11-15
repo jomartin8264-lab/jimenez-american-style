@@ -93,7 +93,7 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                   <span className={`meta-value ${product.stock <= 0 ? 'text-danger' : 'text-success'}`}>
                     {product.stock <= 0 
                       ? 'Agotado' 
-                      : `${product.stock} unidades en almacén (${effectiveStock} disponibles)`
+                      : (product.stock === 1 ? 'Pieza única disponible' : `${product.stock} piezas disponibles`)
                     }
                   </span>
                 </div>

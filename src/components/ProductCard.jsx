@@ -77,9 +77,6 @@ const ProductCard = ({ product }) => {
           {product.stock <= 0 && (
             <div className="stock-badge out-of-stock">Agotado</div>
           )}
-          {effectiveStock > 0 && effectiveStock <= 2 && (
-            <div className="stock-badge low-stock">¡Últimas {effectiveStock}!</div>
-          )}
         </div>
         
         <div className="product-info">
@@ -102,9 +99,9 @@ const ProductCard = ({ product }) => {
           <h3 className="product-title">{product.name}</h3>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
-            <p className="product-price">${product.price.toFixed(2)}</p>
+            <p className="product-price">${Number(product.price || 0).toFixed(2)}</p>
             <span style={{ fontSize: '0.75rem', color: effectiveStock > 0 ? 'var(--color-text-light)' : '#ff3b3b' }}>
-              {effectiveStock > 0 ? `${effectiveStock} disp.` : 'Agotado'}
+              {effectiveStock > 0 ? (effectiveStock === 1 ? 'Pieza única' : `${effectiveStock} disp.`) : 'Agotado'}
             </span>
           </div>
 

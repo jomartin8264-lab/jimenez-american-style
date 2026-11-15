@@ -192,6 +192,10 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 ### M. Calibración de Impresión de Etiquetas (24 por Hoja Carta)
 * Plantilla calibrada para 24 etiquetas por hoja (3 columnas x 8 filas) en papel carta estándar (215.9 x 279.4 mm). Altura máxima bloqueada a 272mm con `overflow: hidden` para garantizar que no brinque a una segunda hoja vacía.
 
+### N. Tratamiento de Ropa de Paca y Piezas Únicas en Catálogo Web
+* Se eliminó el letrero flotante **"¡Últimas X!"** que aparecía sobre las fotografías de las prendas en el catálogo. Al tratarse de pacas de ropa americana de piezas únicas (stock = 1), el letrero tapaba las fotos y era redundante.
+* Las fotos de las prendas ahora se muestran 100% limpias. En el pie de la tarjeta y modal de detalles se indica discretamente **"Pieza única"** cuando hay 1 disponible, o **"Agotado"** si se vendió.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
