@@ -291,6 +291,19 @@ const Admin = () => {
           uploadedUrl = '/images/brand_logo_1774572391476.png';
         }
         const productCode = (newProduct.code && newProduct.code.trim()) ? newProduct.code.trim() : generateAutoSKU();
+
+        // Verificar que el código no esté duplicado en el inventario
+        if (newProduct.code && newProduct.code.trim()) {
+          const checkQuery = query(collection(db, "products"), where("code", "==", productCode));
+          const checkSnap = await getDocs(checkQuery);
+          if (!checkSnap.empty) {
+            const dup = checkSnap.docs[0].data();
+            alert(`⛔ ACCIÓN BLOQUEADA: El código SKU "${productCode}" ya existe registrado para la prenda "${dup.name}".\n\nNo se permiten duplicados. Escanea una etiqueta nueva o déjalo vacío para generar uno automático.`);
+            setLoading(false);
+            return;
+          }
+        }
+
         const authorEmail = currentUser.email || 'desconocido';
         const authorName = currentUser.displayName || authorEmail.split('@')[0];
         await addDoc(collection(db, "products"), {

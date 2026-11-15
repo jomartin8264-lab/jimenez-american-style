@@ -115,20 +115,31 @@ export default function QuickProductEntryModal({
     if (!cleanCode) return;
 
     try {
-      // Buscar por code o sku
+      // Buscar por code
       const q = query(collection(db, "products"), where("code", "==", cleanCode));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const found = snap.docs[0].data();
         setExistingProduct({ id: snap.docs[0].id, ...found });
         try { soundAlert('error'); } catch (e) {}
-      } else {
-        setExistingProduct(null);
-        try { soundAlert('beep'); } catch (e) {}
-        // Si el código es nuevo y estamos en PC, pasar el foco al campo Nombre
-        if (entryMode === 'pc') {
-          setTimeout(() => nameInputRef.current?.focus(), 80);
-        }
+        return;
+      }
+
+      // Buscar por sku por si acaso
+      const qSku = query(collection(db, "products"), where("sku", "==", cleanCode));
+      const snapSku = await getDocs(qSku);
+      if (!snapSku.empty) {
+        const found = snapSku.docs[0].data();
+        setExistingProduct({ id: snapSku.docs[0].id, ...found });
+        try { soundAlert('error'); } catch (e) {}
+        return;
+      }
+
+      // Si no existe, limpiar estado de duplicado y continuar
+      setExistingProduct(null);
+      try { soundAlert('beep'); } catch (e) {}
+      if (entryMode === 'pc') {
+        setTimeout(() => nameInputRef.current?.focus(), 80);
       }
     } catch (err) {
       console.warn("Error al verificar código:", err);
@@ -182,6 +193,30 @@ export default function QuickProductEntryModal({
       alert("Por favor ingresa o escanea el código de barras de la prenda.");
       codeInputRef.current?.focus();
       return;
+    }
+
+    // BLOQUEO ESTRICTO DE DUPLICADOS: Si ya fue detectado duplicado
+    if (existingProduct) {
+      soundAlert('error');
+      alert(`⛔ ACCIÓN BLOQUEADA: El código "${cleanCode}" ya pertenece a la prenda "${existingProduct.name}".\n\nNo se permite capturar prendas duplicadas. Escanea una etiqueta nueva.`);
+      codeInputRef.current?.focus();
+      return;
+    }
+
+    // Verificación en tiempo real contra la base de datos antes de guardar
+    try {
+      const qCheck = query(collection(db, "products"), where("code", "==", cleanCode));
+      const snapCheck = await getDocs(qCheck);
+      if (!snapCheck.empty) {
+        const found = snapCheck.docs[0].data();
+        setExistingProduct({ id: snapCheck.docs[0].id, ...found });
+        soundAlert('error');
+        alert(`⛔ ACCIÓN BLOQUEADA: El código "${cleanCode}" ya existe en el inventario ("${found.name}").\n\nNo es posible capturar prendas duplicadas.`);
+        codeInputRef.current?.focus();
+        return;
+      }
+    } catch (e) {
+      console.warn("Error en doble verificación de código:", e);
     }
 
     if (!name.trim()) {
@@ -489,21 +524,26 @@ export default function QuickProductEntryModal({
             {/* Aviso si el código ya existe */}
             {existingProduct && (
               <div style={{
-                marginTop: '0.4rem',
-                padding: '0.55rem 0.75rem',
-                backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid #ef4444',
-                borderRadius: '6px',
+                marginTop: '0.45rem',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                border: '2px solid #ef4444',
+                borderRadius: '8px',
                 color: '#fca5a5',
-                fontSize: '0.78rem',
+                fontSize: '0.82rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)'
               }}>
-                <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
-                <span>
-                  <strong>⚠️ Código ya registrado:</strong> "{existingProduct.name}" (${existingProduct.price} | Stock: {existingProduct.stock}). Si continúas, se creará un duplicado.
-                </span>
+                <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: '#fff', fontSize: '0.85rem' }}>⛔ CÓDIGO YA REGISTRADO (BLOQUEADO):</strong><br />
+                  Este código ya le pertenece a <strong>"{existingProduct.name}"</strong> (${existingProduct.price} | Stock: {existingProduct.stock}).
+                  <span style={{ display: 'block', color: '#fca5a5', marginTop: '2px', fontWeight: 600 }}>
+                    El sistema bloqueó el guardado para evitar duplicados. Por favor escanea una etiqueta nueva.
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -881,25 +921,31 @@ export default function QuickProductEntryModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || !!existingProduct}
               style={{
                 flex: 2,
                 padding: '0.75rem',
-                backgroundColor: isSaving ? '#475569' : '#10b981',
+                backgroundColor: existingProduct ? '#ef4444' : (isSaving ? '#475569' : '#10b981'),
                 color: '#fff',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 800,
                 fontSize: '0.95rem',
-                cursor: isSaving ? 'wait' : 'pointer',
+                cursor: (isSaving || existingProduct) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
-                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                boxShadow: existingProduct ? 'none' : '0 4px 15px rgba(16, 185, 129, 0.3)'
               }}
             >
-              {isSaving ? 'Guardando en Almacén...' : (entryMode === 'pc' ? '⚡ Guardar Prenda (Enter)' : '✓ Guardar y Dar de Alta')}
+              {existingProduct ? (
+                '⛔ Código Duplicado (Bloqueado)'
+              ) : isSaving ? (
+                'Guardando en Almacén...'
+              ) : (
+                entryMode === 'pc' ? '⚡ Guardar Prenda (Enter)' : '✓ Guardar y Dar de Alta'
+              )}
             </button>
           </div>
         </form>
