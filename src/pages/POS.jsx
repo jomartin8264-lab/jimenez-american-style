@@ -11,7 +11,7 @@ import {
   CheckCircle, Clock, Phone, MessageSquare, DollarSign, 
   CreditCard, RefreshCw, Barcode, Volume2, VolumeX, 
   ArrowLeft, Store, AlertCircle, Calendar, Users, ShieldCheck, UserPlus, Trash,
-  Edit, Settings, FileText, X
+  Edit, Settings, FileText, X, Package, Eye, ExternalLink, Filter
 } from 'lucide-react';
 import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
@@ -41,6 +41,16 @@ export default function POS() {
   const [categories, setCategories] = useState(['Todos']);
   const [selectedCat, setSelectedCat] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Estados para Pestaña de Inventario en Lista
+  const [invSearch, setInvSearch] = useState('');
+  const [invCategoryFilter, setInvCategoryFilter] = useState('Todos');
+  const [invStatusFilter, setInvStatusFilter] = useState('all'); // 'all', 'in_stock', 'out_of_stock', 'web', 'store'
+  const [editingProductInPOS, setEditingProductInPOS] = useState(null);
+  const [editProdForm, setEditProdForm] = useState({
+    name: '', price: '', stock: 1, size: 'M', category: 'Dama', availableOnline: true, description: ''
+  });
+  const [isSavingEditProd, setIsSavingEditProd] = useState(false);
 
   // Carrito / Ticket de Mostrador
   const [ticketItems, setTicketItems] = useState([]);
@@ -399,6 +409,73 @@ export default function POS() {
       alert("Error al guardar la configuración de APIs.");
     }
     setSavingApi(false);
+  };
+
+  // Funciones para la Gestión de Inventario en Lista
+  const handleQuickStockChange = async (product, delta) => {
+    const rawStock = (product.stock === null || product.stock === undefined || isNaN(Number(product.stock))) ? 0 : Number(product.stock);
+    const newStock = Math.max(0, rawStock + delta);
+    try {
+      await updateDoc(doc(db, "products", product.id), { stock: newStock });
+      soundAlert('beep');
+    } catch (err) {
+      alert("Error al actualizar existencias: " + (err.message || err));
+    }
+  };
+
+  const handleToggleOnline = async (product) => {
+    const nextStatus = product.availableOnline === false;
+    try {
+      await updateDoc(doc(db, "products", product.id), { availableOnline: nextStatus });
+      soundAlert('beep');
+    } catch (err) {
+      alert("Error al cambiar canal de venta: " + (err.message || err));
+    }
+  };
+
+  const handleOpenEditProduct = (product) => {
+    const safeStock = (product.stock === null || product.stock === undefined || isNaN(Number(product.stock))) ? 1 : Number(product.stock);
+    const safePrice = isNaN(Number(product.price)) ? '' : product.price;
+    setEditProdForm({
+      id: product.id,
+      name: product.name || '',
+      price: safePrice,
+      stock: safeStock,
+      size: product.size || 'M',
+      category: product.category || categories[0] || 'Dama',
+      code: product.code || product.sku || '',
+      availableOnline: product.availableOnline !== false,
+      description: product.description || ''
+    });
+    setEditingProductInPOS(product);
+  };
+
+  const handleSaveEditProduct = async (e) => {
+    e.preventDefault();
+    if (!editingProductInPOS) return;
+    setIsSavingEditProd(true);
+    try {
+      const safeStock = isNaN(parseInt(editProdForm.stock, 10)) ? 1 : Math.max(0, parseInt(editProdForm.stock, 10));
+      const safePrice = isNaN(Number(editProdForm.price)) ? 0 : Math.max(0, Number(editProdForm.price));
+
+      await updateDoc(doc(db, "products", editingProductInPOS.id), {
+        name: editProdForm.name.trim(),
+        price: safePrice,
+        stock: safeStock,
+        size: editProdForm.size,
+        category: editProdForm.category,
+        availableOnline: Boolean(editProdForm.availableOnline),
+        description: editProdForm.description || ''
+      });
+
+      soundAlert('success');
+      alert(`✅ Prenda "${editProdForm.name}" actualizada con éxito.`);
+      setEditingProductInPOS(null);
+    } catch (err) {
+      alert("Error al guardar cambios: " + (err.message || err));
+    } finally {
+      setIsSavingEditProd(false);
+    }
   };
 
   // Eliminar prenda (Solo Administradores)
@@ -887,6 +964,44 @@ export default function POS() {
     return true;
   });
 
+  // Productos filtrados para la Pestaña de Inventario (Tabla)
+  const filteredInventoryProducts = products.filter(p => {
+    // 1. Filtro por categoría
+    if (invCategoryFilter !== 'Todos' && p.category !== invCategoryFilter) {
+      return false;
+    }
+    // 2. Filtro por estatus / canal
+    const pStock = (p.stock === null || p.stock === undefined || isNaN(Number(p.stock))) ? 0 : Number(p.stock);
+    if (invStatusFilter === 'in_stock' && pStock <= 0) return false;
+    if (invStatusFilter === 'out_of_stock' && pStock > 0) return false;
+    if (invStatusFilter === 'web' && p.availableOnline === false) return false;
+    if (invStatusFilter === 'store' && p.availableOnline !== false) return false;
+
+    // 3. Filtro por búsqueda
+    if (invSearch.trim()) {
+      const q = invSearch.toLowerCase().trim();
+      const code = (p.code || p.sku || '').toLowerCase();
+      const name = (p.name || '').toLowerCase();
+      const cat = (p.category || '').toLowerCase();
+      const size = (p.size || '').toLowerCase();
+      if (!code.includes(q) && !name.includes(q) && !cat.includes(q) && !size.includes(q)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Estadísticas rápidas de inventario
+  const totalPiecesInStock = products.reduce((acc, p) => {
+    const s = (p.stock === null || p.stock === undefined || isNaN(Number(p.stock))) ? 0 : Number(p.stock);
+    return acc + Math.max(0, s);
+  }, 0);
+  const outOfStockCount = products.filter(p => {
+    const s = (p.stock === null || p.stock === undefined || isNaN(Number(p.stock))) ? 0 : Number(p.stock);
+    return s <= 0;
+  }).length;
+  const webPublishedCount = products.filter(p => p.availableOnline !== false).length;
+
   if (loadingAuth) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#fff' }}>
@@ -916,6 +1031,12 @@ export default function POS() {
             onClick={() => setActiveTab('pos')}
           >
             <ShoppingCart size={18} /> Mostrador
+          </button>
+          <button 
+            className={`pos-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+            onClick={() => setActiveTab('inventory')}
+          >
+            <Package size={18} /> Inventario
           </button>
           <button 
             className={`pos-tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
@@ -1350,6 +1471,449 @@ export default function POS() {
               </button>
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* PESTAÑA: INVENTARIO EN LISTADO TIPO TABLA */}
+      {activeTab === 'inventory' && (
+        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', backgroundColor: '#0b1120' }}>
+          <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+            {/* Header del Inventario */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ margin: '0 0 0.35rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Package size={26} /> Control de Inventario y Almacén
+                </h2>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.88rem' }}>
+                  Listado compacto en tiempo real. Ajusta existencias, edita datos o consulta fotos con un solo clic.
+                </p>
+              </div>
+
+              {/* Acciones superiores */}
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickEntryModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.6rem 1rem',
+                    backgroundColor: '#38bdf8',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  ⚡ Alta Rápida de Prenda
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.6rem 1rem',
+                    backgroundColor: '#10b981',
+                    color: '#fff',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🏷️ Hoja de Etiquetas
+                </button>
+              </div>
+            </div>
+
+            {/* Tarjetas de Estadísticas Rápidas */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Modelos Registrados</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.2rem' }}>
+                  {products.length} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>estilos</span>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Total Piezas Físicas</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34d399', marginTop: '0.2rem' }}>
+                  {totalPiecesInStock} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>prendas</span>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Prendas Agotadas (0)</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: outOfStockCount > 0 ? '#ef4444' : '#64748b', marginTop: '0.2rem' }}>
+                  {outOfStockCount} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>por resurtir</span>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>En Catálogo Web</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fbbf24', marginTop: '0.2rem' }}>
+                  {webPublishedCount} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>con foto online</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de Filtros y Búsqueda */}
+            <div style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {/* Buscador de inventario */}
+                <div style={{ flex: '1 1 280px', position: 'relative' }}>
+                  <Search size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por SKU, nombre, talla o categoría..."
+                    value={invSearch}
+                    onChange={(e) => setInvSearch(e.target.value)}
+                    className="pos-input-sm"
+                    style={{
+                      width: '100%',
+                      paddingLeft: '38px',
+                      paddingTop: '0.6rem',
+                      paddingBottom: '0.6rem',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  {invSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setInvSearch('')}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtro por Categoría */}
+                <select
+                  value={invCategoryFilter}
+                  onChange={(e) => setInvCategoryFilter(e.target.value)}
+                  className="pos-input-sm"
+                  style={{ minWidth: '150px', padding: '0.6rem', borderRadius: '8px', cursor: 'pointer' }}
+                >
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c === 'Todos' ? 'Todas las Categorías' : c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Pestañitas rápidas de estado */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'all', label: `Todos (${products.length})` },
+                  { id: 'in_stock', label: `✅ Con Existencias (${products.length - outOfStockCount})` },
+                  { id: 'out_of_stock', label: `⚠️ Agotados (${outOfStockCount})` },
+                  { id: 'web', label: `🌐 En Tienda Web (${webPublishedCount})` },
+                  { id: 'store', label: `🏬 Solo Tienda Física (${products.length - webPublishedCount})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setInvStatusFilter(tab.id)}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      backgroundColor: invStatusFilter === tab.id ? '#38bdf8' : '#0f172a',
+                      color: invStatusFilter === tab.id ? '#0f172a' : '#94a3b8'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TABLA DE INVENTARIO EN LISTADO COMPACTO */}
+            <div style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>SKU / Código</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Prenda / Artículo</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>Talla</th>
+                      <th style={{ padding: '0.75rem 0.75rem' }}>Categoría</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Precio</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Existencias (Stock)</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>Canal</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>Foto</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInventoryProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                          No se encontraron artículos con los filtros aplicados.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInventoryProducts.map((p, idx) => {
+                        const rawStock = (p.stock === null || p.stock === undefined || isNaN(Number(p.stock))) ? 0 : Number(p.stock);
+                        const hasStock = rawStock > 0;
+                        const pImg = p.image || null;
+                        const isEven = idx % 2 === 0;
+
+                        return (
+                          <tr 
+                            key={p.id}
+                            style={{
+                              backgroundColor: isEven ? '#1e293b' : '#172033',
+                              borderBottom: '1px solid #334155',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                          >
+                            {/* SKU */}
+                            <td style={{ padding: '0.7rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#38bdf8' }}>
+                              {p.code || p.sku || 'S/C'}
+                            </td>
+
+                            {/* Nombre y Autor */}
+                            <td style={{ padding: '0.7rem 1rem' }}>
+                              <div style={{ fontWeight: 600, color: '#f8fafc' }}>{p.name}</div>
+                              {(p.createdByName || p.createdBy) && (
+                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                                  👤 Alta por: {p.createdByName || p.createdBy?.split('@')[0]}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Talla */}
+                            <td style={{ padding: '0.7rem 0.75rem', textAlign: 'center' }}>
+                              <span style={{
+                                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                                color: '#38bdf8',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                fontSize: '0.75rem'
+                              }}>
+                                {p.size || 'M'}
+                              </span>
+                            </td>
+
+                            {/* Categoría */}
+                            <td style={{ padding: '0.7rem 0.75rem', color: '#cbd5e1' }}>
+                              {p.category || 'General'}
+                            </td>
+
+                            {/* Precio */}
+                            <td style={{ padding: '0.7rem 1rem', textAlign: 'right', fontWeight: 700, color: '#f8fafc', fontSize: '0.92rem' }}>
+                              ${Number(p.price || 0).toFixed(2)}
+                            </td>
+
+                            {/* Stock con botones +/- rápidos de 1 clic */}
+                            <td style={{ padding: '0.7rem 1rem', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#0f172a', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #334155' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickStockChange(p, -1)}
+                                  disabled={rawStock <= 0}
+                                  title="Restar 1 existencia"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    backgroundColor: rawStock <= 0 ? 'transparent' : '#334155',
+                                    color: rawStock <= 0 ? '#475569' : '#fff',
+                                    cursor: rawStock <= 0 ? 'not-allowed' : 'pointer',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  -
+                                </button>
+                                
+                                <span style={{
+                                  minWidth: '32px',
+                                  textAlign: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.88rem',
+                                  color: hasStock ? '#34d399' : '#ef4444'
+                                }}>
+                                  {rawStock}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickStockChange(p, 1)}
+                                  title="Sumar 1 existencia"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    backgroundColor: '#334155',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Canal (Web / Tienda) */}
+                            <td style={{ padding: '0.7rem 0.75rem', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleOnline(p)}
+                                title="Clic para alternar publicación en la tienda web"
+                                style={{
+                                  background: p.availableOnline === false ? 'rgba(234, 179, 8, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+                                  color: p.availableOnline === false ? '#facc15' : '#34d399',
+                                  border: `1px solid ${p.availableOnline === false ? 'rgba(234, 179, 8, 0.4)' : 'rgba(52, 211, 153, 0.4)'}`,
+                                  borderRadius: '6px',
+                                  padding: '0.25rem 0.55rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {p.availableOnline === false ? '🏬 Solo Tienda' : '🌐 En Web'}
+                              </button>
+                            </td>
+
+                            {/* Foto (Link Ver Foto) */}
+                            <td style={{ padding: '0.7rem 0.75rem', textAlign: 'center' }}>
+                              {pImg ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage({ url: getProductImage(p), name: p.name, sku: p.code || p.sku, price: p.price })}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    background: 'rgba(56, 189, 248, 0.15)',
+                                    color: '#38bdf8',
+                                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <Eye size={13} /> Ver Foto
+                                </button>
+                              ) : (
+                                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Sin foto</span>
+                              )}
+                            </td>
+
+                            {/* Acciones */}
+                            <td style={{ padding: '0.7rem 1rem', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditProduct(p)}
+                                  title="Editar prenda"
+                                  style={{
+                                    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                                    color: '#38bdf8',
+                                    borderRadius: '6px',
+                                    padding: '0.35rem 0.55rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                >
+                                  <Edit size={13} /> Edit
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedBarcodeProduct(p)}
+                                  title="Imprimir código de barras"
+                                  style={{
+                                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    color: '#34d399',
+                                    borderRadius: '6px',
+                                    padding: '0.35rem 0.55rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                >
+                                  🏷️ Barcode
+                                </button>
+
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteProduct(p)}
+                                    title="Eliminar prenda (Solo Admin)"
+                                    style={{
+                                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                                      color: '#ef4444',
+                                      borderRadius: '6px',
+                                      padding: '0.35rem 0.55rem',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2647,6 +3211,188 @@ export default function POS() {
           </div>
         </div>
       )}
+      {/* MODAL DE EDICIÓN RÁPIDA DE PRENDA DESDE INVENTARIO POS */}
+      {editingProductInPOS && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '16px',
+            border: '1px solid #334155',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '1.5rem',
+            color: '#fff',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  ✏️ Editar Prenda
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                  SKU: {editProdForm.code || editingProductInPOS.id}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProductInPOS(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: '#fff',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProduct} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Nombre de la Prenda
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProdForm.name}
+                  onChange={(e) => setEditProdForm({ ...editProdForm, name: e.target.value })}
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    Precio ($ MXN)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    required
+                    value={editProdForm.price}
+                    onChange={(e) => setEditProdForm({ ...editProdForm, price: e.target.value })}
+                    className="pos-input"
+                    style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#38bdf8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    Existencias / Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editProdForm.stock}
+                    onChange={(e) => setEditProdForm({ ...editProdForm, stock: e.target.value })}
+                    className="pos-input"
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderColor: '#38bdf8' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    Talla
+                  </label>
+                  <input
+                    type="text"
+                    value={editProdForm.size}
+                    onChange={(e) => setEditProdForm({ ...editProdForm, size: e.target.value })}
+                    className="pos-input"
+                    style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    Categoría
+                  </label>
+                  <select
+                    value={editProdForm.category}
+                    onChange={(e) => setEditProdForm({ ...editProdForm, category: e.target.value })}
+                    className="pos-input"
+                    style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                  >
+                    {categories.filter(c => c !== 'Todos').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(51, 65, 85, 0.4)',
+                border: '1px solid #334155'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>
+                    Publicar en Tienda Web
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                    Si está desactivado, sólo estará disponible en la tienda física
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={!!editProdForm.availableOnline}
+                  onChange={(e) => setEditProdForm({ ...editProdForm, availableOnline: e.target.checked })}
+                  style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#10b981' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingProductInPOS(null)}
+                  className="pos-btn-secondary"
+                  style={{ flex: 1, padding: '0.7rem' }}
+                  disabled={isSavingEditProd}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="pos-btn-pay"
+                  style={{ flex: 1, padding: '0.7rem' }}
+                  disabled={isSavingEditProd}
+                >
+                  {isSavingEditProd ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL GENERADOR DE HOJA DE ETIQUETAS EN LOTE */}
       {showBatchModal && (
         <BatchBarcodeModal 

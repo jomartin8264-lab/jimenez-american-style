@@ -166,6 +166,32 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * Abre Google Chrome o Microsoft Edge en modo aplicación (`--app="http://localhost:4500/pos"`), luciendo como una aplicación nativa sin barra de direcciones.
 * Maneja reentrancia: si ya está corriendo, no se traba y solo enfoca la ventana existente (`EADDRINUSE`).
 
+### I. Pestaña de Inventario en Lista en POS (`/pos`)
+* **Ubicación:** Accesible directamente desde la barra superior del POS con el botón `[ 📦 Inventario ]`, evitando salir al panel `/admin`.
+* **Diseño Tipo Listado Compacto:** No muestra fotos pesadas por defecto para una lectura y navegación ultrarrápida.
+* **Visor de Foto `👁️ Ver Foto`:** Enlace en cada fila que abre un modal con la fotografía de alta calidad en grande y precio al hacer clic.
+* **Ajuste de Stock en 1 Clic:** Botones `[-]` y `[+]` directamente en la tabla para subir o bajar existencias sin abrir formularios.
+* **Modal de Edición Rápida:** Botón `Edit` abre un modal en el POS para corregir nombre, precio, stock, talla, categoría y visibilidad web.
+* **Control de Canal Inmediato:** Botón para alternar con un solo clic entre `🌐 En Web` y `🏬 Solo Tienda`.
+* **Filtros Rápidos:** Buscador en tiempo real (SKU, nombre, talla, categoría) y pestañas rápidas (`Todos`, `Con Existencias`, `Agotados`, `En Web`, `Solo Tienda`).
+* **Métricas en Vivo:** 4 tarjetas superiores con conteo de prendas totales, piezas únicas, artículos agotados y publicados en línea.
+
+### J. Blindaje contra Valores `NaN` en Precios, Stock y Carrito
+* **Carrito y Checkout:** Si el usuario borra el campo numérico de prendas en el carrito o envía un valor vacío/inválido, el sistema lo ajusta automáticamente a `1` (`Math.max(1, parseInt(...) || 1)`), impidiendo que se guarden valores `NaN` en las órdenes o en Firestore.
+* **Edición de Stock:** Sanitización total en `Admin.jsx` y `POS.jsx` (`safeStock = isNaN(Number(stock)) ? 1 : Number(stock)`). Si un artículo tenía `stock: NaN` previamente, el formulario ya no se bloquea ni queda en blanco; permite modificarlo y restablecerlo a `1` u otra cantidad deseada sin trabas.
+* **Pedidos Web en Vivo:** Si una orden antigua contiene campos no numéricos, los subtotales y totales se renderizan protegidamente calculando precios seguros y evitando mostrar `$NaN`.
+
+### K. Opciones Duales para Fotos (Cámara y Galería)
+* Los formularios de alta y edición tanto en `/admin` como en los modales incluyen dos botones separados:
+  - 📸 **Tomar Foto:** Abre directamente la cámara del dispositivo móvil (`capture="environment"`).
+  - 🖼️ **Subir de Galería:** Abre el explorador de archivos o la galería de imágenes del celular.
+
+### L. Bloqueo Estricto de SKUs Duplicados
+* Al capturar o escanear un SKU ya existente, el sistema muestra una alerta clara y deshabilita el botón de guardado en tiempo real, evitando prendas duplicadas con el mismo código.
+
+### M. Calibración de Impresión de Etiquetas (24 por Hoja Carta)
+* Plantilla calibrada para 24 etiquetas por hoja (3 columnas x 8 filas) en papel carta estándar (215.9 x 279.4 mm). Altura máxima bloqueada a 272mm con `overflow: hidden` para garantizar que no brinque a una segunda hoja vacía.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

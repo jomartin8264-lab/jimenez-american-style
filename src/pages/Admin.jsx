@@ -267,12 +267,14 @@ const Admin = () => {
 
       if (editingId) {
         const productCode = (editForm.code && editForm.code.trim()) ? editForm.code.trim() : generateAutoSKU();
+        const safeStock = isNaN(parseInt(editForm.stock, 10)) ? 1 : Math.max(0, parseInt(editForm.stock, 10));
+        const safePrice = isNaN(Number(editForm.price)) ? 0 : Math.max(0, Number(editForm.price));
         const updateData = { 
           ...editForm, 
           code: productCode,
           sku: productCode,
-          price: Number(editForm.price), 
-          stock: Number(editForm.stock),
+          price: safePrice, 
+          stock: safeStock,
           availableOnline: editForm.availableOnline !== false
         };
         if (uploadedUrl) updateData.image = uploadedUrl;
@@ -332,13 +334,15 @@ const Admin = () => {
 
   const handleEdit = (product) => {
     setEditingId(product.id);
+    const safeStock = (product.stock === null || product.stock === undefined || isNaN(Number(product.stock))) ? 1 : Number(product.stock);
+    const safePrice = isNaN(Number(product.price)) ? '' : product.price;
     setEditForm({
-      name: product.name,
-      price: product.price,
-      stock: product.stock,
-      code: product.code || generateAutoSKU(),
+      name: product.name || '',
+      price: safePrice,
+      stock: safeStock,
+      code: product.code || product.sku || generateAutoSKU(),
       size: product.size || 'M',
-      image: product.image,
+      image: product.image || '',
       category: product.category || categories[0],
       description: product.description || '',
       availableOnline: product.availableOnline !== false
@@ -544,7 +548,14 @@ const Admin = () => {
                   </div>
                   <div className="form-group">
                     <label>Stock</label>
-                    <input type="number" value={editingId ? editForm.stock : newProduct.stock} onChange={(e) => editingId ? setEditForm({...editForm, stock: e.target.value}) : setNewProduct({...newProduct, stock: e.target.value})} required className="input-field" />
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={editingId ? (isNaN(Number(editForm.stock)) ? '' : editForm.stock) : newProduct.stock} 
+                      onChange={(e) => editingId ? setEditForm({...editForm, stock: e.target.value}) : setNewProduct({...newProduct, stock: e.target.value})} 
+                      required 
+                      className="input-field" 
+                    />
                   </div>
                 </div>
 
@@ -730,7 +741,7 @@ const Admin = () => {
                     <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
                       <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                        <span>${p.price}</span> | <span>Stock: {p.stock}</span> | <span>SKU: {p.code || p.sku || 'N/A'}</span>
+                        <span>${Number(p.price || 0).toFixed(2)}</span> | <span style={{ color: (isNaN(Number(p.stock)) || Number(p.stock) <= 0) ? '#ef4444' : '#10b981', fontWeight: 600 }}>Stock: {isNaN(Number(p.stock)) ? 0 : p.stock}</span> | <span>SKU: {p.code || p.sku || 'N/A'}</span>
                         {p.size && (
                           <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
                             Talla: {p.size}
