@@ -1,11 +1,15 @@
 import React from 'react';
 import { X, ShoppingCart, Info, Tag, Layers } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { getProductImage } from '../utils/productImages';
 import './ProductModal.css';
 
 const ProductModal = ({ product, isOpen, onClose }) => {
   const { addToCart, cartItems } = useCart();
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   if (!isOpen || !product) return null;
 
@@ -21,6 +25,11 @@ const ProductModal = ({ product, isOpen, onClose }) => {
   };
 
   const handleAddToCart = () => {
+    if (!currentUser) {
+      onClose();
+      navigate('/login');
+      return;
+    }
     addToCart(product);
   };
 

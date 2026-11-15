@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { ShoppingCart, Eye } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import ProductModal from './ProductModal';
 import { getProductImage } from '../utils/productImages';
 import './ProductCard.css';
 
 const ProductCard = ({ product }) => {
   const { addToCart, cartItems } = useCart();
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   
@@ -17,6 +21,10 @@ const ProductCard = ({ product }) => {
 
   const handleQuickAdd = (e) => {
     e.stopPropagation(); // Evita abrir el modal al agregar directo al carrito
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
     addToCart(product);
     setIsAdded(true);
     setTimeout(() => {
