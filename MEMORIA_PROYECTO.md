@@ -221,6 +221,21 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Protección Preventiva al Salir:** Si el cajero actual pulsa salir o cambiar de usuario teniendo un turno abierto con dinero en caja, el sistema le advierte que tiene un turno activo y le sugiere hacer el corte antes de marcharse.
 * **Transición en 1 Clic:** Desde la misma ventana del Ticket de Corte impreso, el cajero saliente tiene el botón **`[ 🚪 Salir y Cambiar de Usuario Ahora ]`**, dejando la pantalla limpia en el login para quien lo supla.
 
+### R. Reorganización del Menú, Bloqueo Total de Mostrador y Borrado Administrativo
+* **Menú Superior Limpio y Diferenciado:**
+  - **Vista Empleado/Cajero:** Pestañas estrictamente operativas: `🛒 Mostrador`, `📦 Inventario`, `⚡ Alta Rápida` (para dar de alta prendas en ratos libres con foto/código), `📦 Pedidos Web`, `💵 Caja / Turno` (turno del día, feria, gastos y corte) y botón `🚪 Cambiar Usuario`.
+  - **Módulo `👑 Administración` (Exclusivo Admins):** Agrupa en un solo lugar con submenús:
+    - `📊 Reportes y Finanzas`: Balances por periodos (Día, Semana, Quincena, Mes, Año, Todo), tabla de ventas (con botón de eliminar), tabla de feria/gastos (con botón de eliminar) y tabla de turnos históricos (con botón de ticket y botón de eliminar).
+    - `🏷️ Hoja de Etiquetas`: Impresor masivo de 24 stickers por hoja carta.
+    - `👥 Control de Personal`: Gestión de altas/bajas de empleados y administradores.
+    - `⚙️ Configuración del Sistema`: Categorías dinámicas, datos de la tienda, teléfono/WhatsApp y APIs.
+    - Enlaces rápidos externos: `↗ Panel Admin (/admin)` y `👁 Ver Tienda Web (/)`.
+* **Bloqueo Infranqueable de Mostrador con Caja Cerrada:**
+  - Al no haber turno activo (`!activeShift`), Mostrador queda cubierto por un telón visual con aviso: *"🔒 Caja Cerrada. Abre un turno para comenzar a vender."* y botón `🟢 Abrir Turno de Caja`.
+  - El buscador por código SKU / pistola queda totalmente deshabilitado (`disabled`), el catálogo bloquea clics, el botón cobrar no opera y al cerrar turno se vacía el ticket con `setTicketItems([])`.
+* **Borrado de Turnos y Movimientos de Prueba para Administrador:**
+  - Columna de `Acciones` con botón rojo `🗑️ Borrar` para eliminar permanentemente turnos de prueba en Firestore (`deleteDoc`) y gastos/feria en el documento del turno (`updateDoc`), recalculando automáticamente los totales contables.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

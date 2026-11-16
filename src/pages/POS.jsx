@@ -34,7 +34,8 @@ export default function POS() {
   // Permisos y estados base
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('pos'); // 'pos', 'orders', 'report'
+  const [activeTab, setActiveTab] = useState('pos'); // 'pos', 'inventory', 'orders', 'cash', 'admin'
+  const [adminSection, setAdminSection] = useState('reports'); // 'reports', 'labels', 'staff', 'config'
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
 
@@ -567,6 +568,94 @@ export default function POS() {
     }
   };
 
+  // Eliminar turno de caja cerrado o de prueba (Solo Administradores)
+  const handleDeleteShift = async (shift) => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo los administradores pueden eliminar registros de turnos de caja.");
+      return;
+    }
+    if (!shift || !shift.id) return;
+    const cajero = shift.cashierName || shift.cashierEmail || 'Sin cajero';
+    const fecha = shift.openedAtMillis ? new Date(shift.openedAtMillis).toLocaleString() : 'Fecha N/A';
+    const confirmDelete = window.confirm(
+      `⚠️ ¿Estás seguro de ELIMINAR permanentemente este registro de turno de caja?\n\nCajero: ${cajero}\nApertura: ${fecha}\nFondo inicial: $${Number(shift.initialCash || 0).toFixed(2)}\nVentas: $${Number(shift.salesCash || 0).toFixed(2)}\nTotal en caja: $${Number(shift.actualCash || shift.expectedCash || 0).toFixed(2)}\n\nEsta acción limpiará permanentemente este turno del historial.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDoc(doc(db, "cash_shifts", shift.id));
+      if (activeShift && activeShift.id === shift.id) {
+        setActiveShift(null);
+      }
+      soundAlert('beep');
+      alert(`✅ Registro del turno de "${cajero}" eliminado correctamente.`);
+    } catch (err) {
+      console.error("Error al eliminar turno:", err);
+      soundAlert('error');
+      alert("Error al eliminar turno: " + (err.message || err));
+    }
+  };
+
+  // Eliminar movimiento de feria o gasto de prueba (Solo Administradores)
+  const handleDeleteMovement = async (mov) => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo los administradores pueden eliminar movimientos de caja.");
+      return;
+    }
+    if (!mov || !mov.shiftId) {
+      alert("No se pudo identificar el turno al que pertenece este movimiento.");
+      return;
+    }
+    const tipo = mov.type === 'in' ? 'Entrada (Feria)' : 'Salida (Gasto)';
+    const monto = Number(mov.amount || 0).toFixed(2);
+    const confirmDelete = window.confirm(
+      `⚠️ ¿Estás seguro de ELIMINAR permanentemente este movimiento de ${tipo}?\n\nMonto: $${monto}\nConcepto: "${mov.reason}"\nRegistró: ${mov.performedBy || mov.cashier || 'Cajero'}\n\nEsta acción limpiará este registro y recalculará los totales del turno.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const shiftRef = doc(db, "cash_shifts", mov.shiftId);
+      const shiftSnap = await getDoc(shiftRef);
+      if (!shiftSnap.exists()) {
+        alert("El turno al que pertenecía este movimiento ya no existe.");
+        return;
+      }
+      const sData = shiftSnap.data();
+      const currentMovs = sData.movements || [];
+      const updatedMovs = currentMovs.filter(m => {
+        if (mov.id && m.id) return m.id !== mov.id;
+        if (mov.timeMillis && m.timeMillis) return m.timeMillis !== mov.timeMillis;
+        return !(m.reason === mov.reason && Number(m.amount) === Number(mov.amount));
+      });
+
+      const newTotalIn = updatedMovs.filter(m => m.type === 'in').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+      const newTotalOut = updatedMovs.filter(m => m.type === 'out').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+
+      const payload = {
+        movements: updatedMovs,
+        totalIn: newTotalIn,
+        totalOut: newTotalOut
+      };
+
+      if (sData.status === 'closed') {
+        const cashSales = Number(sData.salesCash) || 0;
+        const initCash = Number(sData.initialCash) || 0;
+        const expCash = initCash + cashSales + newTotalIn - newTotalOut;
+        const actCash = Number(sData.actualCash) || 0;
+        payload.expectedCash = expCash;
+        payload.difference = actCash - expCash;
+      }
+
+      await updateDoc(shiftRef, payload);
+      soundAlert('beep');
+      alert("✅ Movimiento eliminado correctamente.");
+    } catch (err) {
+      console.error("Error al eliminar movimiento:", err);
+      soundAlert('error');
+      alert("Error al eliminar movimiento: " + (err.message || err));
+    }
+  };
+
   // 2. Suscripción en Tiempo Real a Productos / Inventario y Categorías
   useEffect(() => {
     if (!currentUser) return;
@@ -654,6 +743,14 @@ export default function POS() {
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== '') {
       e.preventDefault();
+      if (!activeShift) {
+        soundAlert('error');
+        alert("⚠️ La caja está CERRADA. Debes abrir un turno con tu fondo de caja antes de comenzar a vender prendas en mostrador.");
+        setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+        setOpenShiftInitialCash('500');
+        setShowOpenShiftModal(true);
+        return;
+      }
       const code = searchQuery.trim().toLowerCase();
       // Buscar coincidencia exacta por código SKU
       const found = products.find(p => (p.code && p.code.toLowerCase() === code) || (p.sku && p.sku.toLowerCase() === code));
@@ -925,6 +1022,8 @@ export default function POS() {
       setShowCloseShiftModal(false);
       setCloseShiftCountedCash('');
       setCloseShiftNotes('');
+      // Limpiar ticket por seguridad al cerrar turno
+      setTicketItems([]);
 
       // Modal de ticket de corte para imprimir
       const receiptData = {
@@ -1323,7 +1422,7 @@ export default function POS() {
           </div>
         </div>
 
-        {/* PESTAÑAS */}
+        {/* PESTAÑAS PRINCIPALES */}
         <div className="pos-tabs">
           <button 
             className={`pos-tab-btn ${activeTab === 'pos' ? 'active' : ''}`}
@@ -1338,6 +1437,19 @@ export default function POS() {
             <Package size={18} /> Inventario
           </button>
           <button 
+            type="button"
+            className="pos-tab-btn"
+            onClick={() => setShowQuickEntryModal(true)}
+            style={{ 
+              color: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.12)',
+              border: '1px solid rgba(56, 189, 248, 0.3)'
+            }}
+            title="Alta ultrarrápida escaneando código ya pegado (PC o Celular)"
+          >
+            ⚡ Alta Rápida
+          </button>
+          <button 
             className={`pos-tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
             onClick={() => setActiveTab('orders')}
           >
@@ -1347,25 +1459,26 @@ export default function POS() {
             )}
           </button>
           <button 
-            className={`pos-tab-btn ${activeTab === 'report' ? 'active' : ''}`}
-            onClick={() => setActiveTab('report')}
+            className={`pos-tab-btn ${activeTab === 'cash' ? 'active' : ''}`}
+            onClick={() => setActiveTab('cash')}
           >
-            <Calendar size={18} /> Corte de Caja
+            <Wallet size={18} /> Caja / Turno
           </button>
           {isAdmin && (
             <button 
-              className={`pos-tab-btn ${activeTab === 'team' ? 'active' : ''}`}
-              onClick={() => setActiveTab('team')}
+              className={`pos-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('admin');
+                setAdminSection('reports');
+              }}
+              style={{
+                backgroundColor: activeTab === 'admin' ? '#f59e0b' : 'rgba(245, 158, 11, 0.15)',
+                color: activeTab === 'admin' ? '#0f172a' : '#fbbf24',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                fontWeight: 800
+              }}
             >
-              <Users size={18} /> Control de Usuarios
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              className={`pos-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
-              onClick={() => setActiveTab('config')}
-            >
-              <Settings size={18} /> Configuración
+              👑 Administración
             </button>
           )}
         </div>
@@ -1374,7 +1487,7 @@ export default function POS() {
         <div className="pos-actions-top">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#1e293b', padding: '0.35rem 0.75rem', borderRadius: '6px', border: '1px solid #334155', fontSize: '0.8rem' }}>
             <span style={{ color: isAdmin ? '#fbbf24' : '#38bdf8', fontWeight: 700 }}>
-              {isAdmin ? '👑 Administrador' : '👔 Empleado'}
+              {isAdmin ? '👑 Admin' : '👔 Cajero'}
             </span>
             <span style={{ color: '#94a3b8' }}>({currentUser?.email?.split('@')[0]})</span>
           </div>
@@ -1386,58 +1499,7 @@ export default function POS() {
           >
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
-          <button 
-            type="button"
-            onClick={() => setShowBatchModal(true)}
-            style={{ 
-              color: '#34d399', 
-              background: 'rgba(52, 211, 153, 0.15)', 
-              border: '1px solid rgba(52, 211, 153, 0.35)', 
-              fontSize: '0.85rem', 
-              padding: '0.5rem 0.8rem', 
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
-            }}
-            title="Imprimir múltiples etiquetas en hoja tamaño carta"
-          >
-            🏷️ Hoja de Etiquetas
-          </button>
-          <button 
-            type="button"
-            onClick={() => setShowQuickEntryModal(true)}
-            style={{ 
-              color: '#38bdf8', 
-              background: 'rgba(56, 189, 248, 0.15)', 
-              border: '1px solid rgba(56, 189, 248, 0.35)', 
-              fontSize: '0.85rem', 
-              padding: '0.5rem 0.8rem', 
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
-            }}
-            title="Alta ultrarrápida escaneando código ya pegado (PC o Celular)"
-          >
-            ⚡ Alta Rápida
-          </button>
-          <Link 
-            to="/admin" 
-            style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '0.85rem', padding: '0.5rem 0.8rem', background: '#334155', borderRadius: '6px' }}
-          >
-            Panel Admin
-          </Link>
-          <Link 
-            to="/" 
-            style={{ color: '#38bdf8', textDecoration: 'none', fontSize: '0.85rem', padding: '0.5rem 0.8rem', background: 'rgba(56,189,248,0.15)', borderRadius: '6px' }}
-          >
-            Ver Tienda Web
-          </Link>
+
           <button
             type="button"
             onClick={handleUserLogout}
@@ -1521,7 +1583,7 @@ export default function POS() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('report')}
+              onClick={() => setActiveTab('cash')}
               style={{
                 backgroundColor: '#1e293b',
                 color: '#cbd5e1',
@@ -1701,16 +1763,96 @@ export default function POS() {
 
       {/* CONTENIDO SEGÚN PESTAÑA */}
       {activeTab === 'pos' && (
-        <div className="pos-layout">
+        <div className="pos-layout" style={{ position: 'relative' }}>
+          {/* BLOQUEO TOTAL CUANDO LA CAJA ESTÁ CERRADA */}
+          {!activeShift && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(11, 17, 32, 0.92)',
+              backdropFilter: 'blur(7px)',
+              zIndex: 35,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1.5rem'
+            }}>
+              <div style={{
+                backgroundColor: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '16px',
+                padding: '2.5rem 2rem',
+                maxWidth: '520px',
+                width: '100%',
+                textAlign: 'center',
+                boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1.2rem'
+              }}>
+                <div style={{
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '50%',
+                  background: 'rgba(234, 179, 8, 0.15)',
+                  border: '2px solid rgba(234, 179, 8, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <AlertTriangle size={36} color="#facc15" />
+                </div>
+                <div>
+                  <h2 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '1.45rem', fontWeight: 800 }}>
+                    Caja Cerrada (Turno Inactivo)
+                  </h2>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.92rem', lineHeight: '1.5' }}>
+                    Para poder agregar prendas al ticket, escanear con la pistola o registrar compras en mostrador, primero debes <strong>abrir un turno de caja</strong> con tu fondo inicial.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+                    setOpenShiftInitialCash('500');
+                    setOpenShiftNotes('');
+                    setShowOpenShiftModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#10b981',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '0.85rem 1.8rem',
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.4)'
+                  }}
+                >
+                  🟢 Abrir Turno de Caja
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* SECCIÓN CATÁLOGO / PRODUCTOS */}
-          <section className="pos-catalog-section">
+          <section className="pos-catalog-section" style={{ opacity: !activeShift ? 0.35 : 1, pointerEvents: !activeShift ? 'none' : 'auto' }}>
             {/* Buscador inteligente */}
             <div className="pos-search-bar">
               <div className="pos-search-input-wrap">
                 <Search size={18} />
                 <input 
                   type="text" 
-                  placeholder="Escribe el nombre de la prenda o código SKU (presiona Enter)..."
+                  placeholder={!activeShift ? "🔒 Caja cerrada - Abre turno para comenzar a vender..." : "Escribe el nombre de la prenda o código SKU (presiona Enter)..."}
+                  disabled={!activeShift}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
@@ -2883,23 +3025,22 @@ export default function POS() {
         </div>
       )}
 
-      {/* PESTAÑA: CORTE DE CAJA, TURNOS Y FINANZAS */}
-      {activeTab === 'report' && (
-        <div className="pos-report-view" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-          <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+      {/* PESTAÑA: CAJA Y TURNO DEL DÍA (OPERACIÓN DIARIA PARA CAJEROS Y ADMIN) */}
+      {(activeTab === 'cash' || (activeTab === 'report' && !isAdmin)) && (
+        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', backgroundColor: '#0b1120' }}>
+          <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
 
-            {/* ENCABEZADO DE LA SECCIÓN */}
+            {/* ENCABEZADO DE CAJA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
                 <h2 style={{ margin: '0 0 0.35rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <Wallet size={26} /> Control de Turnos, Arqueo de Caja y Finanzas
+                  <Wallet size={26} /> Caja y Turno del Día
                 </h2>
                 <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>
-                  Apertura y cierre de turnos por empleado, bitácora de feria/gastos e historial de ventas por periodo.
+                  Apertura de turno, ingreso de feria de tu bolsa, registro de gastos menores y corte de caja al salir.
                 </p>
               </div>
 
-              {/* Botón de acción rápida según si el turno está abierto o no */}
               {!activeShift ? (
                 <button
                   type="button"
@@ -2914,20 +3055,20 @@ export default function POS() {
                     color: '#0f172a',
                     border: 'none',
                     borderRadius: '8px',
-                    padding: '0.65rem 1.25rem',
+                    padding: '0.75rem 1.4rem',
                     fontWeight: 800,
-                    fontSize: '0.9rem',
+                    fontSize: '0.95rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.45rem',
+                    gap: '0.5rem',
                     boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
                   }}
                 >
                   🟢 Abrir Turno de Caja
                 </button>
               ) : (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -2939,14 +3080,14 @@ export default function POS() {
                       backgroundColor: 'rgba(16, 185, 129, 0.15)',
                       color: '#34d399',
                       border: '1px solid rgba(16, 185, 129, 0.4)',
-                      borderRadius: '6px',
-                      padding: '0.55rem 0.9rem',
-                      fontSize: '0.82rem',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1rem',
+                      fontSize: '0.85rem',
                       fontWeight: 700,
                       cursor: 'pointer'
                     }}
                   >
-                    📥 + Ingresar Feria
+                    📥 + Ingresar Feria (Cambio)
                   </button>
                   <button
                     type="button"
@@ -2959,9 +3100,9 @@ export default function POS() {
                       backgroundColor: 'rgba(239, 68, 68, 0.15)',
                       color: '#ef4444',
                       border: '1px solid rgba(239, 68, 68, 0.4)',
-                      borderRadius: '6px',
-                      padding: '0.55rem 0.9rem',
-                      fontSize: '0.82rem',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1rem',
+                      fontSize: '0.85rem',
                       fontWeight: 700,
                       cursor: 'pointer'
                     }}
@@ -2979,9 +3120,9 @@ export default function POS() {
                       backgroundColor: '#38bdf8',
                       color: '#0f172a',
                       border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.55rem 1rem',
-                      fontSize: '0.85rem',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1.2rem',
+                      fontSize: '0.88rem',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
@@ -2992,80 +3133,333 @@ export default function POS() {
               )}
             </div>
 
-            {/* TARJETA DEL TURNO ACTUAL / ARQUEO EN VIVO */}
-            {activeShift && (
+            {/* SI NO HAY TURNO ACTIVO */}
+            {!activeShift ? (
               <div style={{
-                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                border: '1px solid #334155',
+                background: '#1e293b',
+                border: '1px dashed #475569',
                 borderRadius: '12px',
-                padding: '1.25rem',
-                marginBottom: '1.75rem',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
+                padding: '3rem 2rem',
+                textAlign: 'center',
+                color: '#94a3b8'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc' }}>
-                      Turno Abierto: <strong style={{ color: '#38bdf8' }}>{activeShift.cashierName}</strong>
-                    </h3>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                      (Inició: {activeShift.openedAtMillis ? new Date(activeShift.openedAtMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hoy'})
-                    </span>
+                <Wallet size={48} style={{ opacity: 0.4, marginBottom: '0.8rem' }} />
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '1.25rem' }}>
+                  No hay ningún turno de caja abierto en este momento
+                </h3>
+                <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.9rem', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  Para comenzar a cobrar prendas en mostrador, pulsa el botón verde para indicar con cuánto dinero en efectivo arrancas tu turno.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero 1');
+                    setOpenShiftInitialCash('500');
+                    setOpenShiftNotes('');
+                    setShowOpenShiftModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#10b981',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.8rem 1.8rem',
+                    fontWeight: 800,
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                  }}
+                >
+                  🟢 Abrir Turno de Caja
+                </button>
+              </div>
+            ) : (
+              <div>
+                {/* TARJETA DEL TURNO ACTUAL / ARQUEO EN VIVO */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                  border: '1px solid #334155',
+                  borderRadius: '12px',
+                  padding: '1.25rem',
+                  marginBottom: '1.75rem',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc' }}>
+                        Turno Abierto: <strong style={{ color: '#38bdf8' }}>{activeShift.cashierName}</strong>
+                      </h3>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        (Inició: {activeShift.openedAtMillis ? new Date(activeShift.openedAtMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hoy'})
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                      Registrado por: <strong>{activeShift.openedByEmail}</strong>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-                    Registrado por: <strong>{activeShift.openedByEmail}</strong>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                    <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Fondo Inicial</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', marginTop: '0.25rem' }}>
+                        ${Number(activeShift.initialCash || 0).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>Monedas y cambio base</div>
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Ventas en Efectivo</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.25rem' }}>
+                        ${currentShiftCashSales.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        {currentShiftSales.filter(s => s.paymentMethod === 'efectivo').length} ventas en mostrador
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#10b981', textTransform: 'uppercase', fontWeight: 600 }}>+ Feria de Bolsa</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
+                        +${currentShiftTotalIn.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        {currentShiftMovements.filter(m => m.type === 'in').length} ingresos de cambio
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#ef4444', textTransform: 'uppercase', fontWeight: 600 }}>- Gastos / Salidas</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', marginTop: '0.25rem' }}>
+                        -${currentShiftTotalOut.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        {currentShiftMovements.filter(m => m.type === 'out').length} gastos (jabón, bolsas, etc.)
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Efectivo Esperado</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: '0.25rem' }}>
+                        ${currentShiftExpectedCash.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>Lo que debe haber en el cajón</div>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Fondo Inicial</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', marginTop: '0.25rem' }}>
-                      ${Number(activeShift.initialCash || 0).toFixed(2)}
+                {/* MOVIMIENTOS REGISTRADOS EN ESTE TURNO */}
+                <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', padding: '1rem', marginBottom: '1.5rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#f8fafc', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    📋 Movimientos de Feria y Gastos de Este Turno ({currentShiftMovements.length})
+                  </h4>
+                  {currentShiftMovements.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '1rem 0', textAlign: 'center' }}>
+                      No has ingresado feria ni registrado gastos durante este turno.
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>Monedas y cambio base</div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Ventas en Efectivo</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.25rem' }}>
-                      ${currentShiftCashSales.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      {currentShiftSales.filter(s => s.paymentMethod === 'efectivo').length} ventas en mostrador
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#10b981', textTransform: 'uppercase', fontWeight: 600 }}>+ Feria de Bolsa</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
-                      +${currentShiftTotalIn.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      {currentShiftMovements.filter(m => m.type === 'in').length} ingresos de cambio
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#ef4444', textTransform: 'uppercase', fontWeight: 600 }}>- Gastos / Salidas</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', marginTop: '0.25rem' }}>
-                      -${currentShiftTotalOut.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      {currentShiftMovements.filter(m => m.type === 'out').length} gastos (jabón, bolsas, etc.)
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Efectivo Esperado</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: '0.25rem' }}>
-                      ${currentShiftExpectedCash.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>Lo que debe haber en el cajón</div>
-                  </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                          <th style={{ padding: '0.5rem' }}>Hora</th>
+                          <th style={{ padding: '0.5rem' }}>Tipo</th>
+                          <th style={{ padding: '0.5rem' }}>Monto</th>
+                          <th style={{ padding: '0.5rem' }}>Motivo</th>
+                          <th style={{ padding: '0.5rem' }}>Registró</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentShiftMovements.map((m, idx) => {
+                          const isEntry = m.type === 'in';
+                          return (
+                            <tr key={m.id || idx} style={{ borderBottom: '1px solid #334155' }}>
+                              <td style={{ padding: '0.5rem', color: '#cbd5e1' }}>{m.timeFormatted || 'Hoy'}</td>
+                              <td style={{ padding: '0.5rem' }}>
+                                <span style={{
+                                  padding: '0.15rem 0.45rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  backgroundColor: isEntry ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                  color: isEntry ? '#34d399' : '#ef4444'
+                                }}>
+                                  {isEntry ? '📥 Entrada (Feria)' : '📤 Salida (Gasto)'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.5rem', fontWeight: 800, color: isEntry ? '#34d399' : '#ef4444' }}>
+                                {isEntry ? '+' : '-'}${Number(m.amount || 0).toFixed(2)}
+                              </td>
+                              <td style={{ padding: '0.5rem', color: '#f8fafc' }}>{m.reason}</td>
+                              <td style={{ padding: '0.5rem', color: '#94a3b8' }}>{m.performedBy || 'Cajero'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             )}
+
+            {/* AVISO EXCLUSIVO PARA ADMINISTRADOR */}
+            {isAdmin && (
+              <div style={{
+                marginTop: '1.5rem',
+                backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '10px',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <div>
+                  <strong style={{ color: '#fbbf24', fontSize: '0.92rem' }}>👑 ¿Deseas consultar balances por periodo o el historial de todos los cortes anteriores?</strong>
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    Como Administrador, tienes el módulo contable por semana/mes y eliminación de registros en la pestaña de Administración.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('admin');
+                    setAdminSection('reports');
+                  }}
+                  style={{
+                    backgroundColor: '#f59e0b',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ir a Administración 👑
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA: MÓDULO ADMINISTRATIVO CONSOLIDADO (SOLO ADMINISTRADORES) */}
+      {(activeTab === 'admin' || (activeTab === 'report' && isAdmin)) && isAdmin && (
+        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', backgroundColor: '#0b1120' }}>
+          <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+
+            {/* BARRA DE NAVEGACIÓN ADMINISTRATIVA */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              backgroundColor: '#1e293b',
+              padding: '0.75rem 1rem',
+              borderRadius: '12px',
+              border: '1px solid #334155',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fbbf24', marginRight: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  👑 ADMINISTRACIÓN:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAdminSection('reports')}
+                  style={{
+                    backgroundColor: adminSection === 'reports' ? '#38bdf8' : '#0f172a',
+                    color: adminSection === 'reports' ? '#0f172a' : '#cbd5e1',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  📊 Reportes y Finanzas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminSection('labels');
+                    setShowBatchModal(true);
+                  }}
+                  style={{
+                    backgroundColor: adminSection === 'labels' ? '#34d399' : '#0f172a',
+                    color: adminSection === 'labels' ? '#0f172a' : '#cbd5e1',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🏷️ Hoja de Etiquetas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminSection('staff')}
+                  style={{
+                    backgroundColor: adminSection === 'staff' ? '#38bdf8' : '#0f172a',
+                    color: adminSection === 'staff' ? '#0f172a' : '#cbd5e1',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  👥 Control de Personal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminSection('config')}
+                  style={{
+                    backgroundColor: adminSection === 'config' ? '#38bdf8' : '#0f172a',
+                    color: adminSection === 'config' ? '#0f172a' : '#cbd5e1',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚙️ Configuración del Sistema
+                </button>
+              </div>
+
+              {/* ENLACES RÁPIDOS EXTERNOS */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link 
+                  to="/admin" 
+                  style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '0.82rem', padding: '0.45rem 0.8rem', background: '#334155', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <ExternalLink size={14} /> Panel Admin (/admin)
+                </Link>
+                <Link 
+                  to="/" 
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#38bdf8', textDecoration: 'none', fontSize: '0.82rem', padding: '0.45rem 0.8rem', background: 'rgba(56,189,248,0.15)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Eye size={14} /> Ver Tienda Web
+                </Link>
+              </div>
+            </div>
+
+            {/* CONTENIDO 1: REPORTES Y FINANZAS */}
+            {adminSection === 'reports' && (
+              <div>
 
             {/* SELECTOR DE PERIODO (DÍA, SEMANA, QUINCENA, MES, AÑO, TODAS) */}
             <div style={{
@@ -3360,12 +3754,13 @@ export default function POS() {
                       <th style={{ padding: '0.75rem 1rem' }}>Monto</th>
                       <th style={{ padding: '0.75rem 1rem' }}>Concepto / Motivo</th>
                       <th style={{ padding: '0.75rem 1rem' }}>Registró</th>
+                      {isAdmin && <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {periodAllMovements.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={isAdmin ? 6 : 5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                           No hay entradas de feria ni retiros de gastos registrados en este periodo.
                         </td>
                       </tr>
@@ -3399,102 +3794,30 @@ export default function POS() {
                             <td style={{ padding: '0.75rem 1rem', color: '#94a3b8' }}>
                               👤 {mov.performedBy || mov.cashier || 'Cajero'}
                             </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* 3. SUBTAB: HISTORIAL DE TURNOS Y CORTES */}
-            {reportSubTab === 'shifts' && (
-              <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-                  <thead>
-                    <tr style={{ background: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.5px' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Cajero / Turno</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Apertura</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Cierre</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Fondo</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ventas Efectivo</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Esperado</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Físico</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Diferencia</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ticket</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {periodShifts.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                          No hay turnos registrados en este periodo.
-                        </td>
-                      </tr>
-                    ) : (
-                      periodShifts.map((sh) => {
-                        const isOpen = sh.status === 'open';
-                        const openDate = sh.openedAtMillis ? new Date(sh.openedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Hoy';
-                        const closeDate = sh.closedAtMillis ? new Date(sh.closedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : (isOpen ? '🟢 En Curso' : 'Cerrado');
-                        const diff = Number(sh.difference || 0);
-
-                        return (
-                          <tr key={sh.id} style={{ borderBottom: '1px solid #334155' }}>
-                            <td style={{ padding: '0.75rem 1rem' }}>
-                              <strong style={{ color: '#f8fafc' }}>{sh.cashierName}</strong>
-                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{sh.openedByEmail}</div>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{openDate}</td>
-                            <td style={{ padding: '0.75rem 1rem', color: isOpen ? '#34d399' : '#cbd5e1' }}>{closeDate}</td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>${Number(sh.initialCash || 0).toFixed(2)}</td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#38bdf8', fontWeight: 700 }}>
-                              ${Number(sh.salesCash || 0).toFixed(2)}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700 }}>
-                              ${Number(sh.expectedCash || 0).toFixed(2)}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#f8fafc' }}>
-                              {isOpen ? '--' : `$${Number(sh.actualCash || 0).toFixed(2)}`}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              {isOpen ? (
-                                <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>
-                                  🟢 Abierto
-                                </span>
-                              ) : (
-                                <span style={{
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  backgroundColor: diff === 0 ? 'rgba(52, 211, 153, 0.15)' : (diff > 0 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
-                                  color: diff === 0 ? '#34d399' : (diff > 0 ? '#38bdf8' : '#ef4444')
-                                }}>
-                                  {diff === 0 ? 'Exacto $0.00' : (diff > 0 ? `+Sobrante $${diff.toFixed(2)}` : `-Faltante $${Math.abs(diff).toFixed(2)}`)}
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              {!isOpen ? (
+                            {isAdmin && (
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setLastClosedShiftReceipt({
-                                      ...sh,
-                                      dateOpenedFormatted: openDate,
-                                      dateClosedFormatted: closeDate
-                                    });
+                                  onClick={() => handleDeleteMovement(mov)}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                                    color: '#ef4444',
+                                    borderRadius: '5px',
+                                    padding: '0.3rem 0.6rem',
+                                    fontSize: '0.78rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    fontWeight: 700
                                   }}
-                                  className="pos-btn-reprint"
-                                  title="Ver e imprimir ticket de corte de este turno"
+                                  title="Eliminar movimiento de caja (Solo Administrador)"
                                 >
-                                  <Printer size={13} /> Ticket Corte
+                                  <Trash2 size={13} /> Borrar
                                 </button>
-                              ) : (
-                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>En curso</span>
-                              )}
-                            </td>
+                              </td>
+                            )}
                           </tr>
                         );
                       })
@@ -3504,14 +3827,49 @@ export default function POS() {
               </div>
             )}
 
-          </div>
-        </div>
-      )}
+            {/* Fin subtab shifts */}
+            {/* Fin reports section */}
+            </div>
+          )}
 
-      {/* PESTAÑA: CONTROL DE USUARIOS Y ROLES (ADMINISTRADORES Y EMPLEADOS) */}
-      {activeTab === 'team' && isAdmin && (
-        <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-          <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+          {/* SECCIÓN 2: HOJA DE ETIQUETAS */}
+          {adminSection === 'labels' && (
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '2.5rem', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(52, 211, 153, 0.15)', border: '2px solid rgba(52, 211, 153, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem auto' }}>
+                <Barcode size={32} color="#34d399" />
+              </div>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '1.4rem' }}>
+                Impresión Masiva de Etiquetas en Hoja Carta
+              </h3>
+              <p style={{ margin: '0 auto 1.5rem auto', color: '#94a3b8', fontSize: '0.92rem', maxWidth: '560px', lineHeight: '1.5' }}>
+                Genera e imprime planillas de 24 etiquetas adhesivas por hoja carta para etiquetar las prendas de la tienda física. Incluye código SKU, precio, talla y nombre de la prenda.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowBatchModal(true)}
+                style={{
+                  backgroundColor: '#10b981',
+                  color: '#0f172a',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.85rem 2rem',
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                }}
+              >
+                <Barcode size={18} /> Abrir Creador de Hojas de Etiquetas
+              </button>
+            </div>
+          )}
+
+          {/* SECCIÓN 3: CONTROL DE PERSONAL (STAFF) */}
+          {adminSection === 'staff' && (
+            <div style={{ maxWidth: '850px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem' }}>
               <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <ShieldCheck size={28} /> Control de Personal y Privilegios
@@ -3722,13 +4080,11 @@ export default function POS() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* PESTAÑA: CONFIGURACIÓN DEL SISTEMA */}
-      {activeTab === 'config' && isAdmin && (
-        <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-          <div style={{ maxWidth: '750px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* SECCIÓN 4: CONFIGURACIÓN DEL SISTEMA */}
+          {adminSection === 'config' && (
+            <div style={{ maxWidth: '750px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
             <h2 style={{ margin: '0 0 0.25rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Settings size={28} /> Configuración del Sistema
@@ -3839,9 +4195,12 @@ export default function POS() {
                 ))}
               </div>
               <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                Para añadir o cambiar administradores ve a la pestaña <strong>Control de Usuarios</strong>.
+                Para añadir o cambiar administradores ve a la pestaña <strong>Control de Personal</strong>.
               </p>
             </div>
+
+          </div>
+        )}
 
           </div>
         </div>
