@@ -38,6 +38,8 @@ export default function POS() {
   const [adminSection, setAdminSection] = useState('reports'); // 'reports', 'labels', 'staff', 'config'
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
+  const [showPendingForeignCutModal, setShowPendingForeignCutModal] = useState(false);
+  const hasAutoPromptedShiftRef = useRef(false);
 
   // Inventario y categorías
   const [products, setProducts] = useState([]);
@@ -181,7 +183,7 @@ export default function POS() {
   useEffect(() => {
     const checkAuthAndRoles = async () => {
       if (!currentUser) {
-        navigate('/login');
+        navigate('/login?pos=1');
         return;
       }
       try {
@@ -734,6 +736,22 @@ export default function POS() {
       setShiftsList(list);
       const openOne = list.find(s => s.status === 'open');
       setActiveShift(openOne || null);
+
+      // Al entrar al aplicativo: si no hay turno abierto se levanta la caja automáticamente,
+      // o si hay un turno de otro usuario sin corte, se muestra la nota de advertencia
+      if (!hasAutoPromptedShiftRef.current) {
+        hasAutoPromptedShiftRef.current = true;
+        if (!openOne) {
+          // Caja cerrada: levantar inmediatamente el modal de apertura con datos precargados
+          setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+          setOpenShiftInitialCash('500');
+          setShowOpenShiftModal(true);
+        } else if (openOne.openedByEmail && openOne.openedByEmail.toLowerCase() !== currentUser?.email?.toLowerCase()) {
+          // Turno ajeno sin corte: alertar con nota prominente
+          setShowPendingForeignCutModal(true);
+          soundAlert('error');
+        }
+      }
     }, (err) => console.warn("Aviso al cargar turnos:", err));
 
     return () => unsub();
@@ -1058,7 +1076,7 @@ export default function POS() {
     try {
       setShowLogoutConfirmModal(false);
       await logout();
-      navigate('/login');
+      navigate('/login?pos=1');
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
       alert("No se pudo cerrar la sesión: " + (err.message || err));
@@ -5438,6 +5456,93 @@ export default function POS() {
                 style={{ padding: '0.65rem', marginTop: '0.25rem' }}
               >
                 Cancelar (Quedarme aquí)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL / NOTA: CORTE DE CAJA PENDIENTE DEL USUARIO ANTERIOR */}
+      {showPendingForeignCutModal && isForeignShiftOpen && activeShift && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 99999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem', backdropFilter: 'blur(6px)'
+        }}>
+          <div style={{
+            background: '#1e293b',
+            border: '2px solid #ef4444',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            padding: '2rem',
+            boxShadow: '0 25px 50px -12px rgba(239, 68, 68, 0.45)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⚠️</div>
+            <h2 style={{ color: '#f87171', margin: '0 0 0.5rem 0', fontSize: '1.35rem', fontWeight: 800 }}>
+              AVISO: CORTE DE CAJA PENDIENTE
+            </h2>
+            <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: 1.5, margin: '0 0 1.25rem 0' }}>
+              El cajero anterior <strong style={{ color: '#38bdf8' }}>{activeShift.cashierName || activeShift.openedByEmail}</strong> dejó el turno abierto sin realizar corte de caja.
+            </p>
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px dashed #ef4444', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem', textAlign: 'left', fontSize: '0.88rem' }}>
+              <p style={{ margin: '0 0 0.35rem 0', color: '#fca5a5' }}>
+                • <strong>Fondo inicial:</strong> ${Number(activeShift.initialCash || 0).toFixed(2)}
+              </p>
+              <p style={{ margin: '0 0 0.35rem 0', color: '#fca5a5' }}>
+                • <strong>Ventas registradas:</strong> ${currentShiftCashSales.toFixed(2)}
+              </p>
+              <p style={{ margin: 0, color: '#fca5a5' }}>
+                • <strong>Efectivo esperado en caja:</strong> ${currentShiftExpectedCash.toFixed(2)}
+              </p>
+            </div>
+            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '1.5rem', lineHeight: 1.4 }}>
+              Para evitar revolver el dinero entre turnos, realiza el corte de entrega antes de que comiences a vender con tu cuenta (<strong style={{ color: '#f8fafc' }}>{currentUser?.email}</strong>).
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPendingForeignCutModal(false);
+                  setCloseShiftCountedCash(currentShiftExpectedCash.toString());
+                  setCloseShiftNotes(`Turno cerrado por cambio de usuario (${currentUser?.displayName || currentUser?.email})`);
+                  setShowCloseShiftModal(true);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.85rem 1.5rem',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                🏁 Realizar Corte de Entrega de {activeShift.cashierName}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPendingForeignCutModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  color: '#94a3b8',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  padding: '0.75rem',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Continuar a la Pantalla de Turnos
               </button>
             </div>
           </div>

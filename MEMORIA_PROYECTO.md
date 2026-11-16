@@ -236,6 +236,17 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Borrado de Turnos y Movimientos de Prueba para Administrador:**
   - Columna de `Acciones` con botón rojo `🗑️ Borrar` para eliminar permanentemente turnos de prueba en Firestore (`deleteDoc`) y gastos/feria en el documento del turno (`updateDoc`), recalculando automáticamente los totales contables.
 
+### S. Control de Inicio de Sesión Obligatorio, Apertura Inmediata y Reglas Firestore
+* **Inicio de Sesión Obligatorio al Abrir Terminal (`Iniciar-POS.bat`):**
+  * Se configuró el lanzador con `--app="http://localhost:4500/login?pos=1&fresh=1"`.
+  * `Login.jsx` se optimizó para modo Terminal POS: limpia cualquier sesión residual previa para obligar al usuario (dueño, esposa o trabajador suplente) a identificarse con su correo y contraseña.
+  * Al ingresar credenciales correctas, redirige directamente a `/pos`.
+* **Apertura Inmediata de Caja y Nota de Corte Pendiente al Entrar:**
+  * Al ingresar al POS, si la caja está cerrada (`!activeShift`), se abre de forma automática el modal de **Apertura de Turno** precargando el nombre del cajero y el fondo de $500 para activar el mostrador con un solo clic.
+  * Si el cajero anterior dejó la caja abierta (`isForeignShiftOpen`), emerge de inmediato una **Nota de Alerta Prioritaria** advirtiendo que el turno previo no se cortó y ofreciendo el botón directo para realizar el corte de entrega antes de vender.
+* **Reglas de Seguridad Firestore (`firestore.rules`):**
+  * Declaración completa de permisos para `cash_shifts`, `cash_movements`, `orders`, `products` y `config`, eliminando el error `Missing or insufficient permissions` y asegurando que las eliminaciones solo sean permitidas a administradores (`isAdmin()`).
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
