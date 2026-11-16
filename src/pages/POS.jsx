@@ -292,6 +292,13 @@ export default function POS() {
     checkAuthAndRoles();
   }, [currentUser, navigate]);
 
+  // Protección de seguridad: Si no es Administrador, impedir acceso a Inventario o Administración
+  useEffect(() => {
+    if (!loadingAuth && !isAdmin && (activeTab === 'inventory' || activeTab === 'admin')) {
+      setActiveTab('pos');
+    }
+  }, [loadingAuth, isAdmin, activeTab]);
+
   // Manejo de usuarios y roles del personal
   const handleAddStaffUser = async (e) => {
     e.preventDefault();
@@ -1470,12 +1477,14 @@ export default function POS() {
           >
             <ShoppingCart size={18} /> Mostrador
           </button>
-          <button 
-            className={`pos-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('inventory')}
-          >
-            <Package size={18} /> Inventario
-          </button>
+          {isAdmin && (
+            <button 
+              className={`pos-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+              onClick={() => setActiveTab('inventory')}
+            >
+              <Package size={18} /> Inventario
+            </button>
+          )}
           <button 
             type="button"
             className="pos-tab-btn"
@@ -2220,8 +2229,8 @@ export default function POS() {
         </div>
       )}
 
-      {/* PESTAÑA: INVENTARIO EN LISTADO TIPO TABLA */}
-      {activeTab === 'inventory' && (
+      {/* PESTAÑA: INVENTARIO EN LISTADO TIPO TABLA (SOLO ADMINISTRADOR) */}
+      {(activeTab === 'inventory' && isAdmin) && (
         <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', backgroundColor: '#0b1120' }}>
           <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
             {/* Header del Inventario */}

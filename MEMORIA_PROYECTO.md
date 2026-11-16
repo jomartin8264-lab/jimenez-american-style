@@ -255,6 +255,12 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * Subpestaña `📑 Historial de Turnos` en `👑 Administración > Reportes y Finanzas`: renderizado de tabla detallada de cortes con cajero, hora de apertura/cierre, fondo inicial, ventas en efectivo, dinero esperado, dinero físico contado, diferencia contable (exacto, faltante, sobrante), botón `🧾 Ver Corte` (que abre el ticket térmico imprimible) y botón `🗑️ Borrar` para administradores.
   * Sección de `📑 Cortes de Caja y Turnos Anteriores` en la pestaña operativa `💵 Caja / Turno`: acceso rápido para consultar y reimprimir los últimos tickets de corte del día.
 
+### U. Restricción de Acceso a Inventario Exclusiva para Administradores
+* **Pestaña de Inventario Reservada para Administrador:**
+  * La pestaña `📦 Inventario` solo es visible y cliqueable en la barra superior si el usuario autenticado tiene rol de Administrador (`isAdmin`).
+  * Para los empleados/cajeros, la pestaña no aparece en pantalla.
+  * Si un empleado intenta acceder directamente o cambiar el estado a inventario, un `useEffect` de protección lo detecta y lo redirige automáticamente a la pestaña operativa de `🛒 Mostrador`.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
