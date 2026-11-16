@@ -391,23 +391,12 @@ function StickerLabelItem({ item, sheetLayout, isPrint = false }) {
 }
 
 export default function BatchBarcodeModal({ products = [], onClose }) {
-  // Conectar clase especial al body para aislar la hoja en la impresion
-  useEffect(() => {
-    document.body.classList.add('batch-printing-active');
-    if (sheetLayout === 'opalina10') {
-      document.body.classList.add('batch-printing-opalina');
-    } else {
-      document.body.classList.remove('batch-printing-opalina');
-    }
-    return () => {
-      document.body.classList.remove('batch-printing-active');
-      document.body.classList.remove('batch-printing-opalina');
-    };
-  }, [sheetLayout]);
-
   // Separar productos por estado de etiquetado
   const pendingProducts = products.filter(p => !p.labeled);
   const labeledProducts = products.filter(p => p.labeled === true);
+
+  // Formato de hoja: 'opalina10' (10 etiquetas colgantes 5x2), '24' (3x8) o '30' (3x10)
+  const [sheetLayout, setSheetLayout] = useState('opalina10');
 
   // Pestaña de filtro activa: 'pending' (solo pendientes), 'all' (todo el catálogo), 'labeled' (ya etiquetadas)
   const [filterTab, setFilterTab] = useState(() => pendingProducts.length > 0 ? 'pending' : 'all');
@@ -439,16 +428,6 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [actualPrintedSkus, setActualPrintedSkus] = useState(null);
 
-  // Consultar el siguiente número de SKU sin avanzar el contador (solo para vista previa)
-  useEffect(() => {
-    peekNextSkuNumber().then(num => {
-      if (num) setNextStartSeq(num);
-    });
-  }, []);
-
-  // Formato de hoja: 'opalina10' (10 etiquetas colgantes 5x2), '24' (3x8) o '30' (3x10)
-  const [sheetLayout, setSheetLayout] = useState('opalina10');
-
   // Posición inicial (1 a 24 o 30) para aprovechar hojas empezadas
   const [startPosition, setStartPosition] = useState(1);
 
@@ -459,6 +438,27 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const [showPostPrintPrompt, setShowPostPrintPrompt] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccessMsg, setUpdateSuccessMsg] = useState('');
+
+  // Conectar clase especial al body para aislar la hoja en la impresion
+  useEffect(() => {
+    document.body.classList.add('batch-printing-active');
+    if (sheetLayout === 'opalina10') {
+      document.body.classList.add('batch-printing-opalina');
+    } else {
+      document.body.classList.remove('batch-printing-opalina');
+    }
+    return () => {
+      document.body.classList.remove('batch-printing-active');
+      document.body.classList.remove('batch-printing-opalina');
+    };
+  }, [sheetLayout]);
+
+  // Consultar el siguiente número de SKU sin avanzar el contador (solo para vista previa)
+  useEffect(() => {
+    peekNextSkuNumber().then(num => {
+      if (num) setNextStartSeq(num);
+    });
+  }, []);
 
   // Cambiar pestaña de filtro y auto-seleccionar sus prendas
   const handleTabChange = (newTab) => {

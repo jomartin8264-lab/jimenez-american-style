@@ -18,6 +18,7 @@ import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
+import ErrorBoundary from '../components/ErrorBoundary';
 import QuickProductEntryModal from '../components/QuickProductEntryModal';
 import useSEO from '../hooks/useSEO';
 import './POS.css';
@@ -5343,10 +5344,12 @@ export default function POS() {
 
       {/* MODAL GENERADOR DE HOJA DE ETIQUETAS EN LOTE */}
       {showBatchModal && (
-        <BatchBarcodeModal 
-          products={products} 
-          onClose={() => setShowBatchModal(false)} 
-        />
+        <ErrorBoundary onClose={() => setShowBatchModal(false)} onReset={() => setShowBatchModal(false)}>
+          <BatchBarcodeModal 
+            products={products} 
+            onClose={() => setShowBatchModal(false)} 
+          />
+        </ErrorBoundary>
       )}
 
       {/* MODAL DE ALTA RÁPIDA DE PRENDAS (PC Y CELULAR) */}
