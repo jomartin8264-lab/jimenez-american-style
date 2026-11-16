@@ -43,14 +43,367 @@ function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   );
 }
 
+function OpalinaHangtagItem({ item, isPrint = false }) {
+  if (item.isBlank) {
+    return (
+      <div 
+        key={item.key} 
+        style={{ 
+          border: isPrint ? 'none' : '1px dashed #cbd5e1', 
+          visibility: isPrint ? 'hidden' : 'visible',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#94a3b8',
+          fontSize: '0.7rem'
+        }}
+      >
+        {!isPrint && 'Espacio Vacío'}
+      </div>
+    );
+  }
+
+  const itemSize = (item.size || '').toUpperCase().trim();
+
+  return (
+    <div
+      key={item.key}
+      style={{
+        position: 'relative',
+        border: '0.5px dashed #94a3b8',
+        borderRadius: '3px',
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '3mm 2.2mm 2.2mm 2.2mm',
+        boxSizing: 'border-box',
+        height: '100%',
+        maxHeight: '100%',
+        overflow: 'hidden',
+        pageBreakInside: 'avoid',
+        breakInside: 'avoid'
+      }}
+    >
+      {/* 1. GUÍA DE PERFORACIÓN (Círculo para perforadora manual de papel) */}
+      <div style={{
+        position: 'absolute',
+        top: '2.5mm',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '4.5mm',
+        height: '4.5mm',
+        borderRadius: '50%',
+        border: '0.6px dashed #64748b',
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '4.5px',
+        color: '#94a3b8',
+        lineHeight: 1
+      }}>
+        +
+      </div>
+
+      {/* Esquinas biseladas guía de corte (45°) */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '4.5mm',
+        height: '4.5mm',
+        borderRight: '0.5px dashed #cbd5e1',
+        borderBottom: '0.5px dashed #cbd5e1',
+        pointerEvents: 'none'
+      }} />
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: '4.5mm',
+        height: '4.5mm',
+        borderLeft: '0.5px dashed #cbd5e1',
+        borderBottom: '0.5px dashed #cbd5e1',
+        pointerEvents: 'none'
+      }} />
+
+      {/* 2. CABECERA: LOGO + MARCA DE LA TIENDA */}
+      <div style={{ textAlign: 'center', marginTop: '4mm' }}>
+        <img 
+          src="/images/brand_logo_1774572391476.png" 
+          alt="Logo"
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            objectFit: 'cover',
+            display: 'block',
+            margin: '0 auto 1px auto'
+          }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+        <div style={{ 
+          fontFamily: "'Outfit', 'Georgia', serif", 
+          fontSize: '10px', 
+          fontWeight: 900, 
+          letterSpacing: '0.5px', 
+          color: '#0f172a',
+          lineHeight: 1.1
+        }}>
+          Jiménez
+        </div>
+        <div style={{ 
+          fontSize: '5.5px', 
+          fontWeight: 800, 
+          color: '#b45309', 
+          letterSpacing: '1.5px', 
+          textTransform: 'uppercase',
+          lineHeight: 1
+        }}>
+          AMERICAN STYLE
+        </div>
+        <div style={{ 
+          fontSize: '4.5px', 
+          color: '#64748b', 
+          letterSpacing: '0.5px', 
+          textTransform: 'uppercase',
+          marginTop: '1px',
+          lineHeight: 1
+        }}>
+          Moda Americana
+        </div>
+      </div>
+
+      {/* LÍNEA DIVISORIA */}
+      <div style={{ borderTop: '0.5px solid #e2e8f0', margin: '2px 0' }} />
+
+      {/* 3. DETALLE DE PRENDA, TALLAS Y PRECIO */}
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{
+          fontSize: '7.5px',
+          fontWeight: 700,
+          color: '#1e293b',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textTransform: 'uppercase',
+          lineHeight: 1
+        }}>
+          {item.name || 'Moda Americana'}
+        </div>
+
+        {/* CASILLAS DE TALLA (IDÉNTICO A LA FOTO DE REFERENCIA) */}
+        <div style={{ marginTop: '1px' }}>
+          <div style={{ fontSize: '5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>
+            TALLA / SIZE
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: '1px',
+            border: '0.6px solid #0f172a',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            backgroundColor: '#0f172a'
+          }}>
+            {['CH', 'M', 'G', 'XL', 'PLUS'].map((sz) => {
+              const isMatch = itemSize === sz || 
+                              (sz === 'CH' && ['S', 'XS', 'CH', 'CHICA', 'SMALL'].includes(itemSize)) ||
+                              (sz === 'M' && ['M', 'MED', 'MEDIANA', 'MEDIUM'].includes(itemSize)) ||
+                              (sz === 'G' && ['L', 'G', 'GRANDE', 'LARGE'].includes(itemSize)) ||
+                              (sz === 'XL' && ['XL', 'EG', 'EXTRA', 'EXTRA LARGE'].includes(itemSize)) ||
+                              (sz === 'PLUS' && ['XXL', '2XL', '3XL', 'PLUS', 'CURVY', '1X', '2X', '3X'].includes(itemSize));
+
+              return (
+                <div 
+                  key={sz}
+                  style={{
+                    backgroundColor: isMatch ? '#0f172a' : '#ffffff',
+                    color: isMatch ? '#ffffff' : '#0f172a',
+                    fontWeight: 800,
+                    fontSize: '6px',
+                    padding: '1.5px 0',
+                    textAlign: 'center',
+                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative'
+                  }}
+                >
+                  {sz}
+                  {isMatch && (
+                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7.5px', color: '#38bdf8' }}>✓</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CUADRO DE PRECIO */}
+        <div style={{ 
+          marginTop: '2px', 
+          padding: '2.5px 4px', 
+          backgroundColor: '#f8fafc', 
+          borderRadius: '3px',
+          border: '0.5px solid #e2e8f0'
+        }}>
+          {item.isPreprinted || item.price == null ? (
+            <div style={{ fontSize: '7.5px', fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', lineHeight: 1 }}>
+              PRECIO: $ ________
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', lineHeight: 1 }}>
+              <span style={{ fontSize: '6px', color: '#64748b', fontWeight: 700 }}>PRECIO:</span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#0f172a' }}>
+                ${Number(item.price).toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. BLOQUE INFERIOR: CÓDIGO DE BARRAS + SKU + REDES */}
+      <div style={{ 
+        marginTop: 'auto',
+        paddingTop: '2px',
+        borderTop: '0.6px solid #e2e8f0',
+        textAlign: 'center'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '1px 0' }}>
+          <BarcodeSVG code={item.code} height={14} width={1.05} />
+        </div>
+
+        <div style={{ 
+          fontFamily: 'monospace', 
+          fontSize: '7.5px', 
+          fontWeight: 800, 
+          letterSpacing: '0.8px',
+          color: '#0f172a',
+          lineHeight: 1
+        }}>
+          {item.code}
+        </div>
+
+        <div style={{ 
+          fontSize: '4.5px', 
+          color: '#64748b', 
+          marginTop: '2px',
+          letterSpacing: '0.3px',
+          lineHeight: 1
+        }}>
+          @jimenezamericanstyle • Tienda Alina
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StickerLabelItem({ item, sheetLayout, isPrint = false }) {
+  if (item.isBlank) {
+    return (
+      <div 
+        key={item.key} 
+        style={{
+          border: isPrint ? 'none' : '1px dashed #e2e8f0',
+          visibility: isPrint ? 'hidden' : 'visible',
+          height: isPrint ? '100%' : (sheetLayout === '24' ? '28mm' : '23mm'),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#cbd5e1',
+          fontSize: '0.7rem'
+        }}
+      >
+        {!isPrint && 'Vacío'}
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      key={item.key}
+      style={{
+        border: isPrint ? '1px solid #111111' : '1px solid #e2e8f0',
+        borderRadius: isPrint ? '3px' : '4px',
+        padding: isPrint ? '1.2mm 1.5mm' : '1.2mm 1.2mm',
+        height: isPrint ? '100%' : (sheetLayout === '24' ? '28mm' : '23mm'),
+        maxHeight: isPrint ? '100%' : undefined,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        textAlign: 'center',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        backgroundColor: '#ffffff',
+        color: '#000000',
+        pageBreakInside: 'avoid',
+        breakInside: 'avoid'
+      }}
+    >
+      <div>
+        <div style={{ fontSize: isPrint ? '7px' : '0.62rem', color: isPrint ? '#475569' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
+          ALINA
+        </div>
+        <div style={{
+          fontSize: isPrint ? '8.5px' : '0.70rem',
+          fontWeight: 'bold',
+          color: isPrint ? '#000000' : '#0f172a',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          marginTop: '1px',
+          lineHeight: 1
+        }}>
+          {item.name}
+        </div>
+      </div>
+
+      <div style={{ margin: isPrint ? '0.2mm 0' : '1px 0' }}>
+        <BarcodeSVG code={item.code} height={15} width={1.2} />
+        <div style={{ fontSize: isPrint ? '7.5px' : '0.62rem', fontFamily: 'monospace', fontWeight: isPrint ? 700 : 600, color: isPrint ? '#000000' : '#334155', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
+          {item.code}
+        </div>
+      </div>
+
+      {item.isPreprinted || item.price == null ? (
+        <div style={{ 
+          fontSize: isPrint ? '7.5px' : '0.62rem', 
+          color: isPrint ? '#000000' : '#334155', 
+          fontWeight: 700, 
+          lineHeight: 1,
+          borderTop: isPrint ? '0.5px dashed #64748b' : '0.5px dashed #cbd5e1',
+          paddingTop: isPrint ? '1px' : '2px'
+        }}>
+          TALLA: _____ &nbsp; $________
+        </div>
+      ) : (
+        <div style={{ fontSize: isPrint ? '10px' : '0.78rem', fontWeight: '800', color: isPrint ? '#000000' : '#0f172a', lineHeight: 1 }}>
+          ${Number(item.price).toFixed(2)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BatchBarcodeModal({ products = [], onClose }) {
   // Conectar clase especial al body para aislar la hoja en la impresion
   useEffect(() => {
     document.body.classList.add('batch-printing-active');
+    if (sheetLayout === 'opalina10') {
+      document.body.classList.add('batch-printing-opalina');
+    } else {
+      document.body.classList.remove('batch-printing-opalina');
+    }
     return () => {
       document.body.classList.remove('batch-printing-active');
+      document.body.classList.remove('batch-printing-opalina');
     };
-  }, []);
+  }, [sheetLayout]);
 
   // Separar productos por estado de etiquetado
   const pendingProducts = products.filter(p => !p.labeled);
@@ -81,7 +434,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
   // Modo principal: 'preprinted' (Lote de Códigos Libres) | 'existing' (Prendas del Inventario)
   const [mainMode, setMainMode] = useState('preprinted');
-  const [blankCount, setBlankCount] = useState(24);
+  const [blankCount, setBlankCount] = useState(10);
   const [nextStartSeq, setNextStartSeq] = useState(1001);
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [actualPrintedSkus, setActualPrintedSkus] = useState(null);
@@ -93,8 +446,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     });
   }, []);
 
-  // Formato de hoja: '24' (3x8) o '30' (3x10)
-  const [sheetLayout, setSheetLayout] = useState('24');
+  // Formato de hoja: 'opalina10' (10 etiquetas colgantes 5x2), '24' (3x8) o '30' (3x10)
+  const [sheetLayout, setSheetLayout] = useState('opalina10');
 
   // Posición inicial (1 a 24 o 30) para aprovechar hojas empezadas
   const [startPosition, setStartPosition] = useState(1);
@@ -239,6 +592,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
             category: p.category || 'Ropa',
             price: p.price,
             code: code,
+            size: p.size || '',
             isPreprinted: false
           });
         }
@@ -250,7 +604,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     ? [] 
     : Object.keys(selectedIds).filter(id => selectedIds[id]);
   const totalLabelsToPrint = flatLabels.filter(l => !l.isBlank).length;
-  const labelsPerPage = Number(sheetLayout); // 24 o 30
+  const labelsPerPage = sheetLayout === 'opalina10' ? 10 : Number(sheetLayout);
   
   // Dividir en páginas exactas
   const pages = [];
@@ -486,26 +840,30 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                      {[24, 48, 72, 96, 100].map(cnt => (
-                        <button
-                          key={cnt}
-                          type="button"
-                          onClick={() => setBlankCount(cnt)}
-                          style={{
-                            flex: '1 1 auto',
-                            padding: '0.35rem 0.45rem',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            backgroundColor: blankCount === cnt ? '#38bdf8' : '#0f172a',
-                            color: blankCount === cnt ? '#000' : '#94a3b8',
-                            border: blankCount === cnt ? '1px solid #38bdf8' : '1px solid #334155',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {cnt === 24 ? '24 (1 hoja)' : cnt === 48 ? '48 (2 hojas)' : cnt === 72 ? '72 (3 hojas)' : cnt === 96 ? '96 (4 hojas)' : `${cnt} pzas`}
-                        </button>
-                      ))}
+                      {(sheetLayout === 'opalina10' ? [10, 20, 30, 50, 100] : (sheetLayout === '24' ? [24, 48, 72, 96, 120] : [30, 60, 90, 120, 150])).map(cnt => {
+                        const sheets = sheetLayout === 'opalina10' ? cnt / 10 : (sheetLayout === '24' ? cnt / 24 : cnt / 30);
+                        const labelText = Number.isInteger(sheets) ? `${cnt} (${sheets} ${sheets === 1 ? 'hoja' : 'hojas'})` : `${cnt} pzas`;
+                        return (
+                          <button
+                            key={cnt}
+                            type="button"
+                            onClick={() => setBlankCount(cnt)}
+                            style={{
+                              flex: '1 1 auto',
+                              padding: '0.35rem 0.45rem',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              backgroundColor: blankCount === cnt ? '#38bdf8' : '#0f172a',
+                              color: blankCount === cnt ? '#000' : '#94a3b8',
+                              border: blankCount === cnt ? '1px solid #38bdf8' : '1px solid #334155',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {labelText}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -533,19 +891,28 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       </label>
                       <select
                         value={sheetLayout}
-                        onChange={(e) => setSheetLayout(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSheetLayout(val);
+                          if (val === 'opalina10') setBlankCount(10);
+                          else if (val === '24') setBlankCount(24);
+                          else if (val === '30') setBlankCount(30);
+                          setStartPosition(1);
+                        }}
                         style={{
                           width: '100%',
                           padding: '0.45rem',
                           borderRadius: '6px',
                           backgroundColor: '#0f172a',
-                          border: '1px solid #475569',
+                          border: '1px solid #38bdf8',
                           color: '#fff',
-                          fontSize: '0.8rem'
+                          fontSize: '0.8rem',
+                          fontWeight: 700
                         }}
                       >
-                        <option value="24">24 (3x8) Ropa</option>
-                        <option value="30">30 (3x10) Compacto</option>
+                        <option value="opalina10">🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)</option>
+                        <option value="24">📄 Autoadhesiva 24 (3x8) Ropa</option>
+                        <option value="30">📄 Autoadhesiva 30 (3x10) Compacto</option>
                       </select>
                     </div>
 
@@ -665,19 +1032,25 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   </label>
                   <select
                     value={sheetLayout}
-                    onChange={(e) => setSheetLayout(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSheetLayout(val);
+                      setStartPosition(1);
+                    }}
                     style={{
                       width: '100%',
                       padding: '0.45rem',
                       borderRadius: '6px',
                       backgroundColor: '#0f172a',
-                      border: '1px solid #475569',
+                      border: '1px solid #38bdf8',
                       color: '#fff',
-                      fontSize: '0.8rem'
+                      fontSize: '0.8rem',
+                      fontWeight: 700
                     }}
                   >
-                    <option value="24">24 (3x8) Ropa</option>
-                    <option value="30">30 (3x10) Compacto</option>
+                    <option value="opalina10">🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)</option>
+                    <option value="24">📄 Autoadhesiva 24 (3x8) Ropa</option>
+                    <option value="30">📄 Autoadhesiva 30 (3x10) Compacto</option>
                   </select>
                 </div>
 
@@ -1084,103 +1457,35 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     key={`preview_page_${pIdx}`}
                     style={{
                       width: '100%',
-                      maxWidth: '700px',
+                      maxWidth: sheetLayout === 'opalina10' ? '820px' : '700px',
                       backgroundColor: '#ffffff',
                       color: '#000000',
-                      padding: '8mm 6mm',
+                      padding: sheetLayout === 'opalina10' ? '6mm 6mm' : '8mm 6mm',
                       borderRadius: '4px',
                       boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
                       boxSizing: 'border-box'
                     }}
                   >
-                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', textAlign: 'right', marginBottom: '4px' }}>
-                      Página {pIdx + 1} de {totalPages}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0284c7' }}>
+                        {sheetLayout === 'opalina10' ? '🏷️ Hoja Opalina (10 Etiquetas Colgantes Boutique)' : '📄 Hoja Autoadhesiva'}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        Página {pIdx + 1} de {totalPages}
+                      </span>
                     </div>
+
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm'
+                      gridTemplateColumns: sheetLayout === 'opalina10' ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)',
+                      gridTemplateRows: sheetLayout === 'opalina10' ? 'repeat(2, 98mm)' : undefined,
+                      gap: sheetLayout === 'opalina10' ? '2mm 2.5mm' : (sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm')
                     }}>
-                      {pageLabels.map((item, idx) => {
-                        if (item.isBlank) {
-                          return (
-                            <div 
-                              key={item.key} 
-                              style={{
-                                border: '1px dashed #e2e8f0',
-                                height: sheetLayout === '24' ? '28mm' : '23mm',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#cbd5e1',
-                                fontSize: '0.7rem'
-                              }}
-                            >
-                              Vacío (#{idx + 1})
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div 
-                            key={item.key}
-                            style={{
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '4px',
-                              padding: '1.2mm 1.2mm',
-                              height: sheetLayout === '24' ? '28mm' : '23mm',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              textAlign: 'center',
-                              boxSizing: 'border-box',
-                              overflow: 'hidden',
-                              backgroundColor: '#fff'
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
-                                ALINA
-                              </div>
-                              <div style={{
-                                fontSize: '0.70rem',
-                                fontWeight: 'bold',
-                                color: '#0f172a',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                marginTop: '1px'
-                              }}>
-                                {item.name}
-                              </div>
-                            </div>
-
-                            <div style={{ margin: '1px 0' }}>
-                              <BarcodeSVG code={item.code} height={15} width={1.2} />
-                              <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 600, color: '#334155', marginTop: '1px', letterSpacing: '0.5px' }}>
-                                {item.code}
-                              </div>
-                            </div>
-
-                            {item.isPreprinted || item.price == null ? (
-                              <div style={{ 
-                                fontSize: '0.62rem', 
-                                color: '#334155', 
-                                fontWeight: 700, 
-                                lineHeight: 1,
-                                borderTop: '0.5px dashed #cbd5e1',
-                                paddingTop: '2px'
-                              }}>
-                                TALLA: _____ &nbsp; $________
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#0f172a', lineHeight: 1 }}>
-                                ${Number(item.price).toFixed(2)}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {pageLabels.map((item, idx) => (
+                        sheetLayout === 'opalina10'
+                          ? <OpalinaHangtagItem key={item.key || idx} item={item} isPrint={false} />
+                          : <StickerLabelItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={false} />
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -1193,21 +1498,29 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
       {/* PORTAL EXCLUSIVO DE IMPRESIÓN (Aislado totalmente del resto de la página) */}
       {createPortal(
         <div id="batch-print-portal" className="batch-print-portal">
+          <style>{`
+            @media print {
+              @page {
+                size: ${sheetLayout === 'opalina10' ? 'letter landscape' : 'letter portrait'};
+                margin: 0mm;
+              }
+            }
+          `}</style>
           {pages.map((pageLabels, pIdx) => (
             <div 
               key={`print_page_${pIdx}`}
               className="batch-print-page"
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gridTemplateRows: sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)',
-                gap: sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm',
+                gridTemplateColumns: sheetLayout === 'opalina10' ? 'repeat(5, 51.5mm)' : 'repeat(3, 1fr)',
+                gridTemplateRows: sheetLayout === 'opalina10' ? 'repeat(2, 98.5mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)'),
+                gap: sheetLayout === 'opalina10' ? '2mm 2.5mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'),
                 boxSizing: 'border-box',
-                padding: '5mm 5mm',
+                padding: sheetLayout === 'opalina10' ? '4mm 5mm' : '5mm 5mm',
                 width: '100%',
-                maxWidth: '215mm',
-                height: '272mm',
-                maxHeight: '272mm',
+                maxWidth: sheetLayout === 'opalina10' ? '270mm' : '215mm',
+                height: sheetLayout === 'opalina10' ? '204mm' : '272mm',
+                maxHeight: sheetLayout === 'opalina10' ? '204mm' : '272mm',
                 margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',
@@ -1218,85 +1531,11 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                 overflow: 'hidden'
               }}
             >
-              {pageLabels.map((item) => {
-                if (item.isBlank) {
-                  return (
-                    <div 
-                      key={item.key} 
-                      style={{ 
-                        border: 'none', 
-                        visibility: 'hidden',
-                        height: '100%',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  );
-                }
-                return (
-                  <div 
-                    key={item.key}
-                    style={{
-                      border: '1px solid #111111',
-                      borderRadius: '3px',
-                      padding: '1.2mm 1.5mm',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      textAlign: 'center',
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      backgroundColor: '#ffffff',
-                      height: '100%',
-                      maxHeight: '100%',
-                      color: '#000000',
-                      pageBreakInside: 'avoid',
-                      breakInside: 'avoid'
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '7px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
-                        ALINA
-                      </div>
-                      <div style={{
-                        fontSize: '8.5px',
-                        fontWeight: 'bold',
-                        color: '#000000',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        marginTop: '1px',
-                        lineHeight: 1
-                      }}>
-                        {item.name}
-                      </div>
-                    </div>
-
-                    <div style={{ margin: '0.2mm 0' }}>
-                      <BarcodeSVG code={item.code} height={15} width={1.2} />
-                      <div style={{ fontSize: '7.5px', fontFamily: 'monospace', fontWeight: 700, color: '#000000', marginTop: '1px', letterSpacing: '0.5px', lineHeight: 1 }}>
-                        {item.code}
-                      </div>
-                    </div>
-
-                    {item.isPreprinted || item.price == null ? (
-                      <div style={{ 
-                        fontSize: '7.5px', 
-                        color: '#000000', 
-                        fontWeight: 700, 
-                        lineHeight: 1,
-                        borderTop: '0.5px dashed #64748b',
-                        paddingTop: '1px'
-                      }}>
-                        TALLA: _____ &nbsp; $________
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '10px', fontWeight: '800', color: '#000000', lineHeight: 1 }}>
-                        ${Number(item.price).toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {pageLabels.map((item, idx) => (
+                sheetLayout === 'opalina10'
+                  ? <OpalinaHangtagItem key={item.key || idx} item={item} isPrint={true} />
+                  : <StickerLabelItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={true} />
+              ))}
             </div>
           ))}
         </div>,

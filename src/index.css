@@ -266,6 +266,16 @@ h1, h2, h3, h4, h5, h6 {
     break-inside: avoid !important;
   }
 
+  /* Formato Opalina Horizontal (10 etiquetas colgantes 5x2) */
+  body.batch-printing-active.batch-printing-opalina .batch-print-page {
+    width: 268mm !important;
+    max-width: 268mm !important;
+    height: 204mm !important;
+    max-height: 204mm !important;
+    padding: 2mm 3mm !important;
+    margin: 0 auto !important;
+  }
+
   body.batch-printing-active #batch-print-portal * {
     visibility: visible !important;
     color: #000000 !important;

@@ -333,6 +333,18 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   3. **Módulo de Utilidad (`skuCounter.js`):**
      * Función `resetSkuSequence(targetNumber)` que actualiza de forma atómica `config/counters -> skuSequence` en Firestore para que todos los dispositivos tomen el nuevo folio sincronizado al instante.
 
+### DD. Etiquetas Colgantes en Papel Opalina (Hangtags 10 por Hoja Carta con Logo)
+* **Objetivo y Ahorro:**
+  * Reemplazo de hojas autoadhesivas costosas por papel opalina grueso económico (200g-250g). En un solo paso se imprime la etiqueta completa de ropa: logo de tienda, diseño tipo boutique, tabla de tallas, precio y código de barras integrado.
+* **Características de la Etiqueta Opalina 10:**
+  * **Distribución:** 10 etiquetas por hoja Carta (distribución horizontal 5 columnas x 2 filas, cada una de 5.2 cm de ancho x 10 cm de alto).
+  * **Círculo de perforación superior (`○`):** Guía exacta para perforadora manual para meter hilo o plastiflecha.
+  * **Guías de corte tenues (líneas punteadas y esquinas biseladas 45°):** Para corte limpio con guillotina o tijeras.
+  * **Logo Oficial:** Insignia dorada de *Jiménez American Style*.
+  * **Casillas de Talla:** `[ CH ] [ M ] [ G ] [ XL ] [ PLUS ]` (limpias en modo lote en blanco; marcadas automáticamente si se imprime prenda del catálogo).
+  * **Código de Barras CODE128 + SKU:** Altura e intensidad calibrada para pistolas lectoras y escáneres de smartphone.
+  * **Compatibilidad:** Selector de formato en `BatchBarcodeModal.jsx` permite alternar entre `🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)`, `24 (3x8)` y `30 (3x10)`.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
