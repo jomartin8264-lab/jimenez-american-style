@@ -247,6 +247,14 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Reglas de Seguridad Firestore (`firestore.rules`):**
   * Declaración completa de permisos para `cash_shifts`, `cash_movements`, `orders`, `products` y `config`, eliminando el error `Missing or insufficient permissions` y asegurando que las eliminaciones solo sean permitidas a administradores (`isAdmin()`).
 
+### T. Cobro Exclusivo en Efectivo y Visualización de Cortes de Caja
+* **Cobro Exclusivo en Efectivo en Mostrador:**
+  * Se removieron los botones de selección `Tarjeta` y `Transferencia` del panel derecho del ticket de venta.
+  * El mostrador opera directamente con cálculo de efectivo, calculadora de cambio rápido con billetes ($100, $200, $500, $1000, Exacto) y botón de completar venta.
+* **Visualización Completa de Cortes de Caja en Historial:**
+  * Subpestaña `📑 Historial de Turnos` en `👑 Administración > Reportes y Finanzas`: renderizado de tabla detallada de cortes con cajero, hora de apertura/cierre, fondo inicial, ventas en efectivo, dinero esperado, dinero físico contado, diferencia contable (exacto, faltante, sobrante), botón `🧾 Ver Corte` (que abre el ticket térmico imprimible) y botón `🗑️ Borrar` para administradores.
+  * Sección de `📑 Cortes de Caja y Turnos Anteriores` en la pestaña operativa `💵 Caja / Turno`: acceso rápido para consultar y reimprimir los últimos tickets de corte del día.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

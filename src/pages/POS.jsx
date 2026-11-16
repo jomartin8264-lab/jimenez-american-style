@@ -1158,6 +1158,28 @@ export default function POS() {
     setIsEditingReceipt(false);
   };
 
+  // Abrir modal de ticket de corte de caja / arqueo para reimpresión o consulta
+  const openShiftReceiptModal = (shift) => {
+    if (!shift) return;
+    const dateOpenedFormatted = shift.openedAtMillis 
+      ? new Date(shift.openedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+      : (shift.openedAt?.seconds ? new Date(shift.openedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'N/A');
+
+    const dateClosedFormatted = shift.closedAtMillis
+      ? new Date(shift.closedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+      : (shift.closedAt?.seconds ? new Date(shift.closedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : (shift.status === 'open' ? 'En curso (Abierto)' : 'N/A'));
+
+    const receipt = {
+      ...shift,
+      dateOpenedFormatted,
+      dateClosedFormatted,
+      expectedCash: Number(shift.expectedCash != null ? shift.expectedCash : ((Number(shift.initialCash) || 0) + (Number(shift.salesCash) || 0) + (Number(shift.totalIn) || 0) - (Number(shift.totalOut) || 0))),
+      actualCash: Number(shift.actualCash != null ? shift.actualCash : 0),
+      difference: Number(shift.difference != null ? shift.difference : 0)
+    };
+    setLastClosedShiftReceipt(receipt);
+  };
+
   // Finalizar cobro en mostrador
   const handleCompleteSale = async () => {
     if (ticketItems.length === 0) return;
@@ -2126,31 +2148,8 @@ export default function POS() {
                 <span style={{ color: '#34d399' }}>${ticketTotal.toFixed(2)}</span>
               </div>
 
-              {/* Método de pago */}
-              <div className="pos-payment-methods">
-                <button 
-                  className={`pos-method-btn ${paymentMethod === 'efectivo' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('efectivo')}
-                >
-                  <DollarSign size={16} /> Efectivo
-                </button>
-                <button 
-                  className={`pos-method-btn ${paymentMethod === 'tarjeta' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('tarjeta')}
-                >
-                  <CreditCard size={16} /> Tarjeta
-                </button>
-                <button 
-                  className={`pos-method-btn ${paymentMethod === 'transferencia' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('transferencia')}
-                >
-                  <RefreshCw size={16} /> Transfer.
-                </button>
-              </div>
-
-              {/* Si es efectivo, cálculo de cambio */}
-              {paymentMethod === 'efectivo' && (
-                <div className="pos-cash-details">
+              {/* Cobro exclusivamente en efectivo en mostrador */}
+              <div className="pos-cash-details" style={{ marginTop: '0.75rem' }}>
                   <div className="pos-cash-input-row">
                     <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Monto Recibido:</span>
                     <input 
@@ -2185,7 +2184,6 @@ export default function POS() {
                     <span>${changeAmount.toFixed(2)}</span>
                   </div>
                 </div>
-              )}
 
               {!activeShift ? (
                 <button 
@@ -3360,6 +3358,121 @@ export default function POS() {
                 </button>
               </div>
             )}
+
+            {/* ÚLTIMOS CORTES DE CAJA REGISTRADOS */}
+            <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', padding: '1.25rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h4 style={{ margin: 0, color: '#f8fafc', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📑 Cortes de Caja y Turnos Anteriores
+                </h4>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('admin');
+                      setAdminSection('reports');
+                      setReportSubTab('shifts');
+                    }}
+                    style={{
+                      background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.82rem',
+                      fontWeight: 600, cursor: 'pointer', textDecoration: 'underline'
+                    }}
+                  >
+                    Ver historial completo en Administración →
+                  </button>
+                )}
+              </div>
+
+              {shiftsList.length === 0 ? (
+                <div style={{ color: '#94a3b8', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>
+                  Aún no hay turnos registrados en la base de datos.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                        <th style={{ padding: '0.6rem' }}>Cajero</th>
+                        <th style={{ padding: '0.6rem' }}>Apertura</th>
+                        <th style={{ padding: '0.6rem' }}>Cierre</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'right' }}>Fondo</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'right' }}>Ventas Efec.</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'right' }}>Esperado</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'right' }}>Físico</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'center' }}>Diferencia</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'center' }}>Ticket Corte</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shiftsList.slice(0, 10).map(s => {
+                        const openedTime = s.openedAtMillis 
+                          ? new Date(s.openedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                          : (s.openedAt?.seconds ? new Date(s.openedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'N/A');
+
+                        const closedTime = s.closedAtMillis
+                          ? new Date(s.closedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                          : (s.closedAt?.seconds ? new Date(s.closedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : null);
+
+                        const isOpen = s.status === 'open';
+                        const diff = Number(s.difference || 0);
+                        const expected = Number(s.expectedCash != null ? s.expectedCash : (Number(s.initialCash || 0) + Number(s.salesCash || 0) + Number(s.totalIn || 0) - Number(s.totalOut || 0)));
+
+                        return (
+                          <tr key={s.id} style={{ borderBottom: '1px solid #334155' }}>
+                            <td style={{ padding: '0.6rem', fontWeight: 600, color: '#f8fafc' }}>
+                              {s.cashierName || 'Cajero'}
+                              {isOpen && (
+                                <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', backgroundColor: 'rgba(16,185,129,0.2)', color: '#34d399', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                                  Activo
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.6rem', color: '#cbd5e1' }}>{openedTime}</td>
+                            <td style={{ padding: '0.6rem', color: '#cbd5e1' }}>{isOpen ? <span style={{ color: '#fbbf24' }}>En curso</span> : (closedTime || 'Cerrado')}</td>
+                            <td style={{ padding: '0.6rem', textAlign: 'right', color: '#cbd5e1' }}>${Number(s.initialCash || 0).toFixed(2)}</td>
+                            <td style={{ padding: '0.6rem', textAlign: 'right', color: '#38bdf8', fontWeight: 700 }}>${Number(s.salesCash || 0).toFixed(2)}</td>
+                            <td style={{ padding: '0.6rem', textAlign: 'right', color: '#cbd5e1', fontWeight: 600 }}>${expected.toFixed(2)}</td>
+                            <td style={{ padding: '0.6rem', textAlign: 'right', color: isOpen ? '#94a3b8' : '#34d399', fontWeight: 700 }}>{isOpen ? '--' : `$${Number(s.actualCash || 0).toFixed(2)}`}</td>
+                            <td style={{ padding: '0.6rem', textAlign: 'center' }}>
+                              {isOpen ? (
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Pendiente</span>
+                              ) : diff === 0 ? (
+                                <span style={{ color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>Exacto</span>
+                              ) : diff > 0 ? (
+                                <span style={{ color: '#38bdf8', fontSize: '0.75rem', fontWeight: 700 }}>+${diff.toFixed(2)}</span>
+                              ) : (
+                                <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>-${Math.abs(diff).toFixed(2)}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.6rem', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => openShiftReceiptModal(s)}
+                                style={{
+                                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                                  color: '#38bdf8',
+                                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                                  borderRadius: '4px',
+                                  padding: '0.25rem 0.6rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}
+                              >
+                                <FileText size={12} /> Ver Corte
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -3845,8 +3958,156 @@ export default function POS() {
               </div>
             )}
 
-            {/* Fin subtab shifts */}
-            {/* Fin reports section */}
+            {/* 3. SUBTAB: HISTORIAL DE TURNOS Y CORTES DE CAJA */}
+            {reportSubTab === 'shifts' && (
+              <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Cajero / Turno</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Apertura</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Cierre / Corte</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Fondo</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ventas Efec.</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Esperado</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Físico</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Diferencia</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodShifts.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No hay turnos ni cortes de caja registrados en este periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      periodShifts.map(shift => {
+                        const openedTime = shift.openedAtMillis 
+                          ? new Date(shift.openedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                          : (shift.openedAt?.seconds ? new Date(shift.openedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'N/A');
+
+                        const closedTime = shift.closedAtMillis
+                          ? new Date(shift.closedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                          : (shift.closedAt?.seconds ? new Date(shift.closedAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : null);
+
+                        const isOpen = shift.status === 'open';
+                        const diff = Number(shift.difference || 0);
+                        const expected = Number(shift.expectedCash != null ? shift.expectedCash : (Number(shift.initialCash || 0) + Number(shift.salesCash || 0) + Number(shift.totalIn || 0) - Number(shift.totalOut || 0)));
+
+                        return (
+                          <tr key={shift.id} style={{ borderBottom: '1px solid #334155' }}>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <div style={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                {shift.cashierName || 'Cajero'}
+                                {isOpen ? (
+                                  <span style={{ fontSize: '0.68rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
+                                    ● En Curso
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.68rem', backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                    Cerrado
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                {shift.openedByEmail}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1', fontSize: '0.82rem' }}>
+                              {openedTime}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1', fontSize: '0.82rem' }}>
+                              {isOpen ? (
+                                <span style={{ color: '#fbbf24', fontStyle: 'italic' }}>Turno Activo</span>
+                              ) : (
+                                closedTime || 'Cerrado'
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#f8fafc' }}>
+                              ${Number(shift.initialCash || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
+                              ${Number(shift.salesCash || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#f8fafc' }}>
+                              ${expected.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: isOpen ? '#94a3b8' : '#34d399' }}>
+                              {isOpen ? '--' : `$${Number(shift.actualCash || 0).toFixed(2)}`}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                              {isOpen ? (
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Pendiente</span>
+                              ) : diff === 0 ? (
+                                <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                                  Exacto $0.00
+                                </span>
+                              ) : diff > 0 ? (
+                                <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                                  +Sobró ${diff.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                  -Faltó ${Math.abs(diff).toFixed(2)}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => openShiftReceiptModal(shift)}
+                                  style={{
+                                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                                    color: '#38bdf8',
+                                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                                    borderRadius: '5px',
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}
+                                  title="Ver arqueo detallado y ticket de corte de este turno"
+                                >
+                                  <FileText size={13} /> Ver Corte
+                                </button>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteShift(shift)}
+                                    style={{
+                                      background: 'rgba(239, 68, 68, 0.15)',
+                                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                                      color: '#ef4444',
+                                      borderRadius: '5px',
+                                      padding: '0.35rem 0.6rem',
+                                      fontSize: '0.78rem',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      fontWeight: 700
+                                    }}
+                                    title="Eliminar este turno del historial (Solo Administrador)"
+                                  >
+                                    <Trash2 size={13} /> Borrar
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             </div>
           )}
 
