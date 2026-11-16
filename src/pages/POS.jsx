@@ -1998,16 +1998,18 @@ export default function POS() {
                         </div>
                       )}
                       <div className="pos-card-actions">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedBarcodeProduct(p);
-                          }}
-                          className="pos-btn-barcode"
-                          title="Ver e imprimir código de barras"
-                        >
-                          <Barcode size={13} /> Código
-                        </button>
+                        {isAdmin && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBarcodeProduct(p);
+                            }}
+                            className="pos-btn-barcode"
+                            title="Ver e imprimir código de barras (Solo Administrador)"
+                          >
+                            <Barcode size={13} /> Código
+                          </button>
+                        )}
                         {isAdmin && (
                           <button 
                             onClick={(e) => {

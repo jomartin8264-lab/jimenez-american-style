@@ -514,22 +514,26 @@ const Admin = () => {
               >
                 ⚡ Alta Rápida (Pistola / Celular)
               </button>
-              <button
-                type="button"
-                onClick={() => setShowBatchModal(true)}
-                className="btn btn-secondary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
-                title="Imprimir múltiples etiquetas en hoja tamaño carta"
-              >
-                🏷️ Imprimir Hoja de Etiquetas
-              </button>
-              <button 
-                onClick={() => navigate('/pos')}
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#38bdf8', color: '#0f172a', fontWeight: 'bold' }}
-              >
-                🏪 Abrir Punto de Venta (Mostrador)
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowBatchModal(true)}
+                  className="btn btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', border: 'none', cursor: 'pointer', borderRadius: '6px' }}
+                  title="Imprimir múltiples etiquetas en hoja tamaño carta (Solo Administradores)"
+                >
+                  🏷️ Imprimir Hoja de Etiquetas
+                </button>
+              )}
+              {isAdmin && (
+                <button 
+                  onClick={() => navigate('/pos')}
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', backgroundColor: '#38bdf8', color: '#0f172a', fontWeight: 'bold' }}
+                >
+                  🏪 Abrir Punto de Venta (Mostrador)
+                </button>
+              )}
             </div>
           </div>
           
@@ -777,15 +781,17 @@ const Admin = () => {
                           📸 Publicar Web
                         </button>
                       )}
-                      <button 
-                        type="button" 
-                        onClick={() => setSelectedBarcodeProduct(p)} 
-                        className="btn btn-sm" 
-                        title="Imprimir código de barras"
-                        style={{ backgroundColor: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}
-                      >
-                        🏷️ Barcode
-                      </button>
+                      {isAdmin && (
+                        <button 
+                          type="button" 
+                          onClick={() => setSelectedBarcodeProduct(p)} 
+                          className="btn btn-sm" 
+                          title="Imprimir código de barras (Solo Administrador)"
+                          style={{ backgroundColor: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}
+                        >
+                          🏷️ Barcode
+                        </button>
+                      )}
                       <button onClick={() => handleEdit(p)} className="btn btn-sm">Edit</button>
                       {isAdmin && (
                         <button 

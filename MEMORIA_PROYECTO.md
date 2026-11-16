@@ -280,6 +280,12 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Modo de Emergencia por Contingencia (Laptop averiada o sin luz):**
   * Si ocurre una falla en la computadora de la tienda o no hay luz/internet, el Administrador (dueño) puede acceder desde su celular o prestar su usuario administrador al cajero temporalmente, ya que la cuenta `admin` tiene permiso total para operar el Punto de Venta desde cualquier celular o navegador.
 
+### X. Impresión de Etiquetas Exclusiva para Administradores
+* **Ocultamiento de Botones de Impresión de Etiquetas para Empleados:**
+  * En el panel de registro (`Admin.jsx`): se ocultó el botón `🏷️ Imprimir Hoja de Etiquetas` y el botón `🏷️ Barcode` de cada prenda para empleados, dejándolos visibles únicamente si `isAdmin` es true.
+  * Para los empleados en celular, el único botón operativo destacado es **`⚡ Alta Rápida (Pistola / Celular)`** para escanear etiquetas pegadas y tomar fotos.
+  * En las tarjetas de catálogo del mostrador (`POS.jsx`), el botón de imprimir código de barras también quedó condicionado a Administrador.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
