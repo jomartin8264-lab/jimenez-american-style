@@ -302,6 +302,23 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Reflejo Inmediato en Arqueo y Ticket:**
   * El arqueo de turno y el ticket térmico desglosan con precisión los cobros por mandaditos en efectivo sumados a caja vs transferencias bancarias.
 
+### BB. Blindaje de Auditoría y Protección entre Turnos (Cierre y Sellado de Pedidos Web)
+* **El Problema Detectado:**
+  * Un pedido web cobrado en un turno por el Administrador ya había sido cortado. Al entrar otro usuario en un nuevo turno, podía cambiarlo a `Pendiente` y volverlo a poner `Entregado`, robando/duplicando el dinero en el nuevo turno a pesar de haber sido liquidado en el anterior.
+* **Solución y Blindaje Implementado:**
+  1. **Sellado Permanente al Cerrar Turno (`handleCloseShift`):**
+     * Al hacer el corte de caja, todos los pedidos web cobrados en efectivo en ese turno se sellan en Firestore con `shiftClosed: true`, `shiftClosedCashier: nombre`, `shiftClosedAt: timestamp` y `shiftId: activeShift.id`.
+     * Las ventas por mandaditos se suman a `salesCash` y `salesTotal` del corte histórico de forma permanente.
+  2. **Bloqueo Total de Pedidos Auditados:**
+     * Si un pedido ya fue cerrado en un turno anterior (o entregado antes de la apertura del turno actual), queda **🔒 BLOQUEADO**:
+     * El selector de estado queda deshabilitado (`disabled`), mostrando el badge:
+       `🔒 Cerrado en Corte Anterior (Atendido por: [Cajero/Admin])`.
+     * Nadie puede regresarlo a `Pendiente` ni cambiar su método de cobro.
+  3. **Restricción Estricta para Empleados:**
+     * Los empleados (`!isAdmin`) **NO pueden reabrir ni modificar** ningún pedido web que ya figure como `✅ Entregado`. Solo el Administrador tiene facultades para gestionar pedidos completados dentro del turno en curso.
+  4. **Filtro Estricto de Caja:**
+     * Un pedido sellado o perteneciente a un `shiftId` cerrado queda 100% excluido del cálculo de `currentShiftWebCashOrders`, impidiendo cualquier duplicación de efectivo entre turnos.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

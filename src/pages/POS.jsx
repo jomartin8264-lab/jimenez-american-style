@@ -3072,68 +3072,118 @@ export default function POS() {
                         </div>
                       )}
 
-                      <select 
-                        value={order.status || 'pendiente'}
-                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value, order)}
-                        style={{
-                          width: '100%',
-                          background: '#334155',
-                          border: '1px solid #475569',
-                          color: '#fff',
-                          borderRadius: '6px',
-                          padding: '0.55rem 0.5rem',
-                          fontSize: '0.8rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="pendiente">⏳ Pendiente</option>
-                        <option value="en_camino">🚚 En camino</option>
-                        <option value="entregado">✅ Entregado</option>
-                        <option value="cancelado">❌ Cancelado</option>
-                      </select>
+                      {/* Estado del pedido con protección de auditoría */}
+                      {(() => {
+                        const isAudited = isOrderAudited(order);
+                        const isDelivered = order.status === 'entregado';
+                        const isLocked = isAudited || (!isAdmin && isDelivered);
 
-                      {/* Indicador de método de cobro cuando ya está entregado */}
-                      {order.status === 'entregado' && (
-                        <div style={{
-                          marginTop: '0.4rem',
-                          padding: '0.45rem 0.6rem',
-                          borderRadius: '6px',
-                          fontSize: '0.74rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.2rem',
-                          background: order.addedToCash ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                          border: `1px solid ${order.addedToCash ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`,
-                          color: order.addedToCash ? '#34d399' : '#38bdf8'
-                        }}>
-                          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem' }}>
-                            <span>{order.addedToCash ? '🛵 Mandaditos' : '💳 Transferencia'}</span>
-                            <span style={{ fontSize: '0.68rem', opacity: 0.9, fontWeight: 800 }}>
-                              {order.addedToCash ? '+ ENTRA A CAJA' : 'BANCO (NO CAJA)'}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeliveringOrder(order);
-                              setShowDeliverPaymentModal(true);
-                            }}
-                            style={{
-                              marginTop: '0.25rem',
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 255, 255, 0.15)',
-                              color: '#cbd5e1',
-                              borderRadius: '4px',
-                              padding: '2px 6px',
-                              fontSize: '0.68rem',
-                              cursor: 'pointer',
-                              textAlign: 'center'
-                            }}
-                          >
-                            ✏️ Cambiar Cobro
-                          </button>
-                        </div>
-                      )}
+                        return (
+                          <>
+                            <select 
+                              value={order.status || 'pendiente'}
+                              onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value, order)}
+                              disabled={isLocked}
+                              title={
+                                isAudited 
+                                  ? 'Pedido cerrado y auditado en corte de caja anterior' 
+                                  : (!isAdmin && isDelivered ? 'Solo administradores pueden reabrir pedidos entregados' : 'Cambiar estado del pedido')
+                              }
+                              style={{
+                                width: '100%',
+                                background: isLocked ? '#1e293b' : '#334155',
+                                border: '1px solid ' + (isLocked ? '#334155' : '#475569'),
+                                color: isLocked ? '#94a3b8' : '#fff',
+                                borderRadius: '6px',
+                                padding: '0.55rem 0.5rem',
+                                fontSize: '0.8rem',
+                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                opacity: isLocked ? 0.75 : 1
+                              }}
+                            >
+                              <option value="pendiente">⏳ Pendiente</option>
+                              <option value="en_camino">🚚 En camino</option>
+                              <option value="entregado">✅ Entregado</option>
+                              <option value="cancelado">❌ Cancelado</option>
+                            </select>
+
+                            {/* Badge cuando está auditado en corte de turno previo */}
+                            {isAudited ? (
+                              <div style={{
+                                marginTop: '0.4rem',
+                                padding: '0.45rem 0.6rem',
+                                borderRadius: '6px',
+                                fontSize: '0.74rem',
+                                background: 'rgba(100, 116, 139, 0.2)',
+                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                color: '#94a3b8',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.2rem'
+                              }}>
+                                <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#f1f5f9' }}>
+                                  <span>🔒</span>
+                                  <span>Cerrado en Corte Anterior</span>
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
+                                  Atendido por: <strong>{order.shiftClosedCashier || order.deliveredBy || order.deliveredByEmail || 'Turno anterior'}</strong>
+                                </div>
+                                <div style={{ fontSize: '0.66rem', color: order.addedToCash ? '#34d399' : '#38bdf8' }}>
+                                  {order.addedToCash ? '🛵 Mandaditos (Efectivo ya auditado)' : '💳 Transferencia Bancaria'}
+                                </div>
+                              </div>
+                            ) : (
+                              /* Indicador de método de cobro cuando ya está entregado en el turno en curso */
+                              isDelivered && (
+                                <div style={{
+                                  marginTop: '0.4rem',
+                                  padding: '0.45rem 0.6rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.74rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.2rem',
+                                  background: order.addedToCash ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                                  border: '1px solid ' + (order.addedToCash ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.4)'),
+                                  color: order.addedToCash ? '#34d399' : '#38bdf8'
+                                }}>
+                                  <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem' }}>
+                                    <span>{order.addedToCash ? '🛵 Mandaditos' : '💳 Transferencia'}</span>
+                                    <span style={{ fontSize: '0.68rem', opacity: 0.9, fontWeight: 800 }}>
+                                      {order.addedToCash ? '+ ENTRA A CAJA' : 'BANCO (NO CAJA)'}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.66rem', color: '#cbd5e1' }}>
+                                    Atendido por: <strong>{order.deliveredBy || 'Cajero'}</strong>
+                                  </div>
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDeliveringOrder(order);
+                                        setShowDeliverPaymentModal(true);
+                                      }}
+                                      style={{
+                                        marginTop: '0.25rem',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#cbd5e1',
+                                        borderRadius: '4px',
+                                        padding: '2px 6px',
+                                        fontSize: '0.68rem',
+                                        cursor: 'pointer',
+                                        textAlign: 'center'
+                                      }}
+                                    >
+                                      ✏️ Cambiar Cobro
+                                    </button>
+                                  )}
+                                </div>
+                              )
+                            )}
+                          </>
+                        );
+                      })()}
 
                       {isAdmin ? (
                         <button 
