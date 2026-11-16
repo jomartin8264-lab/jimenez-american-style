@@ -214,6 +214,7 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 
 ### Q. Control Multi-Usuario, Cambio de Guardia y Detección de Turno Olvidado
 * **Botón `[ 👤 Cambiar Usuario ]`:** Ubicado en la cabecera superior del POS para que cualquier trabajador, el dueño o la esposa cierren sesión y permitan el acceso inmediato al siguiente usuario.
+* **Bloqueo Estricto de Ventas con Caja Cerrada:** Si no hay un turno de caja abierto, el sistema no permite agregar prendas ni completar ventas en mostrador. El botón de cobro se convierte en `⚠️ Abrir Turno para Cobrar` y abre de inmediato la ventana de apertura con el fondo de caja.
 * **Detección Automática de Turno Ajeno Abierto:** Si un trabajador olvida hacer el corte y otro usuario (dueño, esposa u otro compañero) inicia sesión, el sistema muestra una barra de alerta roja prioritaria:
   - Notifica quién abrió el turno, a qué hora, con cuánto fondo y cuánto dinero en ventas dejó.
   - Permite al nuevo usuario hacer el corte de entrega del turno anterior antes de vender, auditando y cuadrando el dinero para deslindar responsabilidades.

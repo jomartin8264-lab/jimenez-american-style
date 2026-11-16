@@ -675,6 +675,16 @@ export default function POS() {
 
   // Agregar prenda al ticket
   const addToTicket = (product) => {
+    // BLOQUEO ESTRICTO: No se pueden agregar prendas si la caja está cerrada
+    if (!activeShift) {
+      soundAlert('error');
+      alert("⚠️ La caja está CERRADA. Debes abrir un turno con tu fondo de caja antes de comenzar a vender prendas en mostrador.");
+      setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+      setOpenShiftInitialCash('500');
+      setShowOpenShiftModal(true);
+      return;
+    }
+
     if (product.stock <= 0) {
       alert(`La prenda "${product.name}" no tiene existencias.`);
       return;
@@ -732,6 +742,14 @@ export default function POS() {
   // Agregar concepto manual o personalizado al ticket (ej. arreglos, extras, bolsas)
   const handleAddCustomItem = (e) => {
     e.preventDefault();
+    if (!activeShift) {
+      soundAlert('error');
+      alert("⚠️ La caja está CERRADA. Debes abrir un turno con tu fondo de caja antes de cobrar conceptos en mostrador.");
+      setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+      setOpenShiftInitialCash('500');
+      setShowOpenShiftModal(true);
+      return;
+    }
     const name = customItemName.trim();
     const price = parseFloat(customItemPrice);
     if (!name || isNaN(price)) {
@@ -1026,6 +1044,16 @@ export default function POS() {
   // Finalizar cobro en mostrador
   const handleCompleteSale = async () => {
     if (ticketItems.length === 0) return;
+
+    // BLOQUEO ESTRICTO: No se puede cobrar si la caja está cerrada
+    if (!activeShift) {
+      soundAlert('error');
+      alert("⚠️ La caja está CERRADA. Debes abrir un turno con tu fondo de caja antes de realizar cobros en mostrador.");
+      setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+      setOpenShiftInitialCash('500');
+      setShowOpenShiftModal(true);
+      return;
+    }
     
     // Si no escribieron efectivo o pusieron 0, asumir pago exacto
     const effectiveCashGiven = (paymentMethod === 'efectivo' && numCashGiven > 0) ? numCashGiven : ticketTotal;
@@ -1999,14 +2027,36 @@ export default function POS() {
                 </div>
               )}
 
-              <button 
-                className="pos-checkout-btn"
-                disabled={ticketItems.length === 0 || isProcessingSale}
-                onClick={handleCompleteSale}
-              >
-                <CheckCircle size={20} />
-                {isProcessingSale ? 'Registrando Venta...' : 'Completar Venta'}
-              </button>
+              {!activeShift ? (
+                <button 
+                  type="button"
+                  className="pos-checkout-btn"
+                  onClick={() => {
+                    soundAlert('error');
+                    setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero');
+                    setOpenShiftInitialCash('500');
+                    setShowOpenShiftModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#eab308',
+                    color: '#0f172a',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <AlertTriangle size={20} />
+                  ⚠️ Abrir Turno para Cobrar
+                </button>
+              ) : (
+                <button 
+                  className="pos-checkout-btn"
+                  disabled={ticketItems.length === 0 || isProcessingSale}
+                  onClick={handleCompleteSale}
+                >
+                  <CheckCircle size={20} />
+                  {isProcessingSale ? 'Registrando Venta...' : 'Completar Venta'}
+                </button>
+              )}
             </div>
           </aside>
         </div>
