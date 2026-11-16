@@ -218,10 +218,21 @@ export default function POS() {
         setStaffUsers(sList);
 
         // 3. Determinar rol del usuario actual
-        const foundUser = sList.find(u => u.email?.toLowerCase() === currentEmail);
+        const cleanEmails = aEmails.map(e => (typeof e === 'string' ? e.toLowerCase().trim() : ''));
+        const foundUser = sList.find(u => (u.email || '').toLowerCase().trim() === currentEmail);
         const isMaster = currentEmail === 'jomartin8264@gmail.com';
-        const isAdminUser = isMaster || aEmails.map(e => e.toLowerCase()).includes(currentEmail) || foundUser?.role === 'admin';
-        const isEmployeeUser = foundUser?.role === 'employee';
+        const isAdminUser = isMaster || cleanEmails.includes(currentEmail) || foundUser?.role === 'admin';
+        const isEmployeeUser = foundUser?.role === 'employee' || Boolean(foundUser);
+
+        // RESTRICCIÓN DE SEGURIDAD PARA EMPLEADOS (CELULARES / CASA):
+        // Los empleados solo pueden operar el Punto de Venta desde la terminal física local de la tienda (localhost / 127.0.0.1).
+        // Si entran por internet o celular, el acceso al POS está reservado exclusivamente para Administradores.
+        const isLocalTerminal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isAdminUser && isEmployeeUser && !isLocalTerminal) {
+          alert("🔒 Acceso Restringido: Como empleado, solo puedes usar el Punto de Venta en la computadora de mostrador de la tienda. El acceso remoto o desde celulares está reservado para Administradores.");
+          navigate('/admin');
+          return;
+        }
 
         if (isAdminUser) {
           setUserRole('admin');

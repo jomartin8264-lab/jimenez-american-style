@@ -272,6 +272,14 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Permisos en Panel de Administración (`Admin.jsx`):**
   * Empleados autenticados y registrados en `config/staff` tienen acceso total al formulario de alta, edición de prendas y subida de imágenes, manteniendo restringida la eliminación y cambios de configuración sensible al administrador.
 
+### W. Bloqueo de POS Móvil/Remoto para Empleados y Uso Exclusivo de Administrador
+* **Restricción de Acceso al POS en Celulares e Internet:**
+  * En la web pública y en celulares, el enlace y botón de `🏪 PUNTO DE VENTA` se muestra exclusivamente para Administradores (`isAdmin`).
+  * Para los empleados, solo está visible `⚡ REGISTRAR PRENDAS` para dar de alta ropa.
+  * Si un empleado intenta teclear directamente `/pos` desde un celular o de forma remota (`!isLocalTerminal`), el sistema lo bloquea con aviso de seguridad y lo redirige a `/admin`.
+* **Modo de Emergencia por Contingencia (Laptop averiada o sin luz):**
+  * Si ocurre una falla en la computadora de la tienda o no hay luz/internet, el Administrador (dueño) puede acceder desde su celular o prestar su usuario administrador al cajero temporalmente, ya que la cuenta `admin` tiene permiso total para operar el Punto de Venta desde cualquier celular o navegador.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

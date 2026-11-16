@@ -86,53 +86,54 @@ const Navbar = () => {
           <Link to="/catalog" className="nav-link">CATÁLOGO</Link>
           <Link to="/nosotros" className="nav-link">NOSOTROS</Link>
           
-          {/* Si es Personal de la tienda (Empleado o Administrador), mostrar accesos operativos */}
+          {/* Si es Personal de la tienda (Empleado o Administrador), mostrar acceso a registrar prendas */}
           {(isAdmin || isStaff) && (
-            <>
-              <Link 
-                to="/admin" 
-                className="nav-link" 
-                style={{ 
-                  fontWeight: 'bold', 
-                  color: '#38bdf8',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}
-                title="Alta y edición de prendas con fotos y código"
-              >
-                ⚡ REGISTRAR PRENDAS
-              </Link>
+            <Link 
+              to="/admin" 
+              className="nav-link" 
+              style={{ 
+                fontWeight: 'bold', 
+                color: '#38bdf8',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Alta y edición de prendas con fotos y código"
+            >
+              ⚡ REGISTRAR PRENDAS
+            </Link>
+          )}
 
-              <Link 
-                to="/pos" 
-                className="nav-link" 
-                style={{ 
-                  fontWeight: 'bold', 
-                  color: '#10b981',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}
-                title="Punto de venta y mostrador físico"
-              >
-                🏪 PUNTO DE VENTA
-              </Link>
-            </>
+          {/* El Punto de Venta en la web/celular solo es accesible para Administradores */}
+          {isAdmin && (
+            <Link 
+              to="/pos" 
+              className="nav-link" 
+              style={{ 
+                fontWeight: 'bold', 
+                color: '#10b981',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Punto de venta y mostrador"
+            >
+              🏪 PUNTO DE VENTA
+            </Link>
           )}
         </div>
 
         <div className="nav-right">
-          {/* Si es Personal en celular, accesos directos al panel de registro y al POS */}
+          {/* En celular: Registro de prendas para empleados/admins, y POS solo para Administradores */}
           {(isAdmin || isStaff) && (
-            <>
-              <Link to="/admin" className="icon-btn mobile-only" title="Registrar Prendas">
-                <PackagePlus size={22} color="#38bdf8" />
-              </Link>
-              <Link to="/pos" className="icon-btn mobile-only" title="Punto de Venta Mostrador">
-                <Store size={22} color="#10b981" />
-              </Link>
-            </>
+            <Link to="/admin" className="icon-btn mobile-only" title="Registrar Prendas">
+              <PackagePlus size={22} color="#38bdf8" />
+            </Link>
+          )}
+          {isAdmin && (
+            <Link to="/pos" className="icon-btn mobile-only" title="Punto de Venta Mostrador (Solo Administradores)">
+              <Store size={22} color="#10b981" />
+            </Link>
           )}
 
           {/* Badge de Rol si es miembro del equipo */}
