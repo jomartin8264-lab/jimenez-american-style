@@ -118,6 +118,8 @@ export default function POS() {
   const [webOrders, setWebOrders] = useState([]);
   const [orderFilter, setOrderFilter] = useState('todos'); // 'todos', 'pendiente', 'en_camino', 'entregado'
   const [webOrderSearch, setWebOrderSearch] = useState('');
+  const [deliveringOrder, setDeliveringOrder] = useState(null);
+  const [showDeliverPaymentModal, setShowDeliverPaymentModal] = useState(false);
   const knownOrderIds = useRef(new Set());
   const initialLoadDone = useRef(false);
 
@@ -1164,7 +1166,7 @@ export default function POS() {
       type: order.type || 'web',
       items: order.items || [],
       total: Number(order.total) || 0,
-      paymentMethod: order.paymentMethod || 'Web / Contra entrega',
+      paymentMethod: order.paymentSubtype === 'mandaditos' ? 'Efectivo (Mandaditos)' : (order.paymentSubtype === 'banco' || order.paymentMethod === 'transferencia' ? 'Transferencia Bancaria' : (order.paymentMethod || 'Web / Contra entrega')),
       cashGiven: Number(order.cashGiven) || Number(order.total) || 0,
       change: Number(order.change) || 0,
       clientName: order.clientName || (order.type === 'pos' ? 'Venta en Mostrador' : 'Cliente Web'),
@@ -1289,13 +1291,65 @@ export default function POS() {
     }
   };
 
-  // Cambiar estado de un pedido web
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+  // Cambiar estado de un pedido web con control de cobro para entregas
+  const handleUpdateOrderStatus = async (orderId, newStatus, orderObj) => {
+    // Si van a marcar como entregado y es un pedido web: preguntar método de cobro
+    if (newStatus === 'entregado') {
+      const order = orderObj || webOrders.find(o => o.id === orderId);
+      if (order && order.type !== 'pos') {
+        setDeliveringOrder(order);
+        setShowDeliverPaymentModal(true);
+        return;
+      }
+    }
+
     try {
-      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+      const payload = { status: newStatus };
+      // Si cambian a otro estado que no sea entregado, retirar la bandera de cobro en caja
+      if (newStatus !== 'entregado') {
+        payload.addedToCash = false;
+        payload.paymentSubtype = null;
+      }
+      await updateDoc(doc(db, "orders", orderId), payload);
+      soundAlert('beep');
     } catch (err) {
       console.error("Error al actualizar pedido:", err);
-      alert("No se pudo actualizar el estado.");
+      alert("No se pudo actualizar el estado: " + err.message);
+    }
+  };
+
+  // Confirmar entrega con método de cobro (Transferencia vs Mandaditos / Efectivo)
+  const handleConfirmDeliveryPayment = async (paymentType) => {
+    if (!deliveringOrder) return;
+    try {
+      const orderId = deliveringOrder.id;
+      const isCash = paymentType === 'mandaditos';
+
+      const payload = {
+        status: 'entregado',
+        paymentMethod: isCash ? 'efectivo' : 'transferencia',
+        paymentSubtype: isCash ? 'mandaditos' : 'banco',
+        addedToCash: isCash,
+        deliveredAt: serverTimestamp(),
+        deliveredAtMillis: Date.now(),
+        deliveredBy: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero',
+        shiftId: isCash && activeShift ? activeShift.id : null
+      };
+
+      await updateDoc(doc(db, "orders", orderId), payload);
+      soundAlert('beep');
+      setShowDeliverPaymentModal(false);
+      setDeliveringOrder(null);
+      
+      if (isCash) {
+        alert(`✅ Pedido entregado y cobrado por Mandaditos.\n\nSe sumaron $${Number(deliveringOrder.total || 0).toFixed(2)} MXN en efectivo a la caja de tu turno.`);
+      } else {
+        alert(`✅ Pedido entregado y registrado por Transferencia.\n\nNO se agregó dinero a la caja física (el dinero quedó en cuenta bancaria).`);
+      }
+    } catch (err) {
+      console.error("Error al confirmar entrega:", err);
+      soundAlert('error');
+      alert("Error al confirmar entrega: " + err.message);
     }
   };
 
@@ -1333,10 +1387,19 @@ export default function POS() {
 
   // Cálculos del Turno Activo (para la barra superior y cierre de turno)
   const shiftStartMillis = activeShift ? (activeShift.openedAtMillis || (activeShift.openedAt?.seconds ? activeShift.openedAt.seconds * 1000 : 0)) : 0;
-  const currentShiftSales = activeShift ? webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStartMillis) : [];
-  const currentShiftCashSales = currentShiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-  const currentShiftCardSales = currentShiftSales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-  const currentShiftTransferSales = currentShiftSales.filter(s => s.paymentMethod === 'transferencia').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  
+  // 1. Ventas de mostrador del turno
+  const currentShiftPosSales = activeShift ? webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStartMillis) : [];
+  
+  // 2. Pedidos Web entregados en este turno y cobrados por Mandaditos (Efectivo físico a caja)
+  const currentShiftWebCashOrders = activeShift ? webOrders.filter(o => o.type === 'web' && o.status === 'entregado' && o.addedToCash === true && (o.shiftId === activeShift.id || (o.deliveredAtMillis || (o.deliveredAt?.seconds ? o.deliveredAt.seconds * 1000 : 0)) >= shiftStartMillis)) : [];
+  const currentShiftWebCashTotal = currentShiftWebCashOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+
+  const currentShiftSales = [...currentShiftPosSales, ...currentShiftWebCashOrders];
+  const currentShiftPosCashSales = currentShiftPosSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const currentShiftCashSales = currentShiftPosCashSales + currentShiftWebCashTotal;
+  const currentShiftCardSales = currentShiftPosSales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const currentShiftTransferSales = currentShiftPosSales.filter(s => s.paymentMethod === 'transferencia').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
   const currentShiftTotalSales = currentShiftCashSales + currentShiftCardSales + currentShiftTransferSales;
   const currentShiftMovements = activeShift?.movements || [];
   const currentShiftTotalIn = currentShiftMovements.filter(m => m.type === 'in').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
@@ -3010,7 +3073,7 @@ export default function POS() {
 
                       <select 
                         value={order.status || 'pendiente'}
-                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value, order)}
                         style={{
                           width: '100%',
                           background: '#334155',
@@ -3027,6 +3090,49 @@ export default function POS() {
                         <option value="entregado">✅ Entregado</option>
                         <option value="cancelado">❌ Cancelado</option>
                       </select>
+
+                      {/* Indicador de método de cobro cuando ya está entregado */}
+                      {order.status === 'entregado' && (
+                        <div style={{
+                          marginTop: '0.4rem',
+                          padding: '0.45rem 0.6rem',
+                          borderRadius: '6px',
+                          fontSize: '0.74rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.2rem',
+                          background: order.addedToCash ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                          border: `1px solid ${order.addedToCash ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`,
+                          color: order.addedToCash ? '#34d399' : '#38bdf8'
+                        }}>
+                          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem' }}>
+                            <span>{order.addedToCash ? '🛵 Mandaditos' : '💳 Transferencia'}</span>
+                            <span style={{ fontSize: '0.68rem', opacity: 0.9, fontWeight: 800 }}>
+                              {order.addedToCash ? '+ ENTRA A CAJA' : 'BANCO (NO CAJA)'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeliveringOrder(order);
+                              setShowDeliverPaymentModal(true);
+                            }}
+                            style={{
+                              marginTop: '0.25rem',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              color: '#cbd5e1',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '0.68rem',
+                              cursor: 'pointer',
+                              textAlign: 'center'
+                            }}
+                          >
+                            ✏️ Cambiar Cobro
+                          </button>
+                        </div>
+                      )}
 
                       {isAdmin ? (
                         <button 
@@ -5826,6 +5932,237 @@ export default function POS() {
                 }}
               >
                 Continuar a la Pantalla de Turnos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA ELEGIR MÉTODO DE COBRO AL ENTREGAR PEDIDO WEB (MANDADITOS VS TRANSFERENCIA) */}
+      {showDeliverPaymentModal && deliveringOrder && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+            color: '#f8fafc',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid #334155', paddingBottom: '1rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '1.5rem' }}>📦</span>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#38bdf8' }}>
+                    Confirmar Entrega de Pedido
+                  </h3>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                  ¿Cómo se realizó el cobro de esta venta web?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeliverPaymentModal(false);
+                  setDeliveringOrder(null);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '1.25rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '6px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Ficha Resumen del Pedido */}
+            <div style={{
+              background: '#0f172a',
+              borderRadius: '10px',
+              padding: '1rem',
+              border: '1px solid #334155',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 700 }}>
+                  FOLIO: {deliveringOrder.folio || (deliveringOrder.id ? deliveringOrder.id.slice(0, 10).toUpperCase() : 'WEB')}
+                </span>
+                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981' }}>
+                  ${Number(deliveringOrder.total || 0).toFixed(2)} MXN
+                </span>
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#e2e8f0', fontWeight: 600 }}>
+                👤 {deliveringOrder.clientName || 'Cliente Web'}
+                {deliveringOrder.clientPhone && (
+                  <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+                    ({deliveringOrder.clientPhone})
+                  </span>
+                )}
+              </div>
+              {deliveringOrder.address && (
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  📍 {deliveringOrder.address}
+                </div>
+              )}
+              {deliveringOrder.items && deliveringOrder.items.length > 0 && (
+                <div style={{ fontSize: '0.78rem', color: '#cbd5e1', borderTop: '1px dashed #334155', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                  👗 {deliveringOrder.items.map(it => `${it.name || 'Prenda'} (${it.size || 'U'})`).join(', ')}
+                </div>
+              )}
+            </div>
+
+            {/* Opciones de Cobro */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Opción 1: MANDADITOS (EFECTIVO - SUMA A CAJA) */}
+              <button
+                type="button"
+                onClick={() => handleConfirmDeliveryPayment('mandaditos')}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%)',
+                  border: '2px solid #10b981',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{
+                  fontSize: '2rem',
+                  background: 'rgba(16, 185, 129, 0.25)',
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  🛵
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#34d399', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>Por Mandaditos (Efectivo)</span>
+                    <span style={{ background: '#10b981', color: '#0f172a', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                      + ENTRA A CAJA
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                    El repartidor cobró al entregar y trajo el dinero en efectivo a la tienda. <strong>Suma ${Number(deliveringOrder.total || 0).toFixed(2)} MXN al arqueo del turno actual.</strong>
+                  </div>
+                </div>
+              </button>
+
+              {/* Opción 2: TRANSFERENCIA BANCARIA (NO SUMA A CAJA) */}
+              <button
+                type="button"
+                onClick={() => handleConfirmDeliveryPayment('transferencia')}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.25) 100%)',
+                  border: '1px solid #3b82f6',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{
+                  fontSize: '2rem',
+                  background: 'rgba(59, 130, 246, 0.2)',
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  💳
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#60a5fa', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>Por Transferencia Bancaria</span>
+                    <span style={{ background: '#3b82f6', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                      BANCO (SIN CAJA)
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                    El cliente transfirió directo a la cuenta de banco. <strong>NO entra a la caja física</strong> ni afecta el arqueo de efectivo del cajero.
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Info de estado de caja */}
+            <div style={{
+              background: activeShift ? 'rgba(16, 185, 129, 0.08)' : 'rgba(234, 179, 8, 0.08)',
+              border: `1px solid ${activeShift ? 'rgba(16, 185, 129, 0.25)' : 'rgba(234, 179, 8, 0.25)'}`,
+              borderRadius: '8px',
+              padding: '0.6rem 0.8rem',
+              fontSize: '0.78rem',
+              color: activeShift ? '#86efac' : '#fde047',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span>{activeShift ? '🟢' : '⚠️'}</span>
+              <span>
+                {activeShift 
+                  ? `Turno activo a nombre de: ${activeShift.cashierName || activeShift.openedByEmail}. Si eliges Mandaditos, se sumará a este corte.`
+                  : 'Caja cerrada: No hay turno activo en este momento. Si cobras en efectivo, abre turno para que compute en tu corte.'}
+              </span>
+            </div>
+
+            {/* Botón cancelar */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #334155', paddingTop: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeliverPaymentModal(false);
+                  setDeliveringOrder(null);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: '#94a3b8',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px',
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
               </button>
             </div>
           </div>

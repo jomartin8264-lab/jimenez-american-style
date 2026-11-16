@@ -292,6 +292,16 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * La pantalla queda 100% enfocada y limpia: muestra la tarjeta principal del **Módulo de Alta Rápida de Prendas** con su botón directo `⚡ Iniciar Alta Rápida de Prenda Ahora` y los 3 pasos visuales para registro ágil con cámara y pistola.
   * Todo el control contable y stock de inventario se mantiene unificado en el Punto de Venta.
 
+### Z. Cobro y Entrega Inteligente de Pedidos Web (Mandaditos vs Transferencia)
+* **Modal Interactivo al Marcar "Entregado":**
+  * En la pestaña de `Pedidos Web en Vivo` del POS, al cambiar el estado de un pedido a `✅ Entregado`, el sistema abre un modal emergente preguntando la forma en que se cobró el pedido:
+    1. **🛵 Por Mandaditos (Efectivo contra entrega):** El repartidor cobró al cliente y trajo el dinero en efectivo a la sucursal física. **SÍ entra a la caja física** del turno actual: se asigna al turno activo (`shiftId`), suma a las ventas en efectivo del turno y eleva el efectivo esperado en el arqueo del cajero.
+    2. **💳 Por Transferencia Bancaria:** El cliente depositó directamente a la cuenta bancaria. **NO entra a la caja física** (no altera el efectivo esperado ni el arqueo físico del cajero).
+* **Badge Visual y Modificación Posterior:**
+  * En la tarjeta del pedido entregado se muestra un indicador visual en color verde (`🛵 Mandaditos (+ ENTRA A CAJA)`) o azul (`💳 Transferencia (BANCO)`), con un botón `✏️ Cambiar Cobro` para rectificar si hubo un error humano sin tener que cancelar el pedido.
+* **Reflejo Inmediato en Arqueo y Ticket:**
+  * El arqueo de turno y el ticket térmico desglosan con precisión los cobros por mandaditos en efectivo sumados a caja vs transferencias bancarias.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
