@@ -11,7 +11,8 @@ import {
   CheckCircle, Clock, Phone, MessageSquare, DollarSign, 
   CreditCard, RefreshCw, Barcode, Volume2, VolumeX, 
   ArrowLeft, Store, AlertCircle, Calendar, Users, ShieldCheck, UserPlus, Trash,
-  Edit, Settings, FileText, X, Package, Eye, ExternalLink, Filter
+  Edit, Settings, FileText, X, Package, Eye, ExternalLink, Filter,
+  Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, AlertTriangle
 } from 'lucide-react';
 import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
@@ -86,8 +87,28 @@ export default function POS() {
   const [editingItemPrice, setEditingItemPrice] = useState('');
 
   // Filtros de historial para reimpresión en Corte de Caja
-  const [reportDateFilter, setReportDateFilter] = useState('today'); // 'today' | 'all'
+  const [reportDateFilter, setReportDateFilter] = useState('today'); // 'today' | 'week' | 'fortnight' | 'month' | 'year' | 'all'
   const [reportSearch, setReportSearch] = useState('');
+  const [reportSubTab, setReportSubTab] = useState('summary'); // 'summary' | 'movements' | 'shifts'
+
+  // Control de Turnos y Movimientos de Caja (Entradas / Salidas / Feria / Gastos)
+  const [shiftsList, setShiftsList] = useState([]);
+  const [activeShift, setActiveShift] = useState(null);
+  const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+  const [openShiftCashier, setOpenShiftCashier] = useState('');
+  const [openShiftInitialCash, setOpenShiftInitialCash] = useState('500');
+  const [openShiftNotes, setOpenShiftNotes] = useState('');
+  const [isSavingShift, setIsSavingShift] = useState(false);
+
+  const [showCashMovementModal, setShowCashMovementModal] = useState(null); // 'in' | 'out' | null
+  const [movementAmount, setMovementAmount] = useState('');
+  const [movementReason, setMovementReason] = useState('');
+  const [isSavingMovement, setIsSavingMovement] = useState(false);
+
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [closeShiftCountedCash, setCloseShiftCountedCash] = useState('');
+  const [closeShiftNotes, setCloseShiftNotes] = useState('');
+  const [lastClosedShiftReceipt, setLastClosedShiftReceipt] = useState(null);
 
   // Pedidos Web en Tiempo Real
   const [webOrders, setWebOrders] = useState([]);
@@ -610,6 +631,24 @@ export default function POS() {
     return () => unsub();
   }, [currentUser, soundEnabled]);
 
+  // 4. Suscripción en Tiempo Real a Turnos de Caja
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = onSnapshot(collection(db, "cash_shifts"), (snapshot) => {
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const timeA = a.openedAtMillis || (a.openedAt?.seconds ? a.openedAt.seconds * 1000 : 0);
+        const timeB = b.openedAtMillis || (b.openedAt?.seconds ? b.openedAt.seconds * 1000 : 0);
+        return timeB - timeA;
+      });
+      setShiftsList(list);
+      const openOne = list.find(s => s.status === 'open');
+      setActiveShift(openOne || null);
+    }, (err) => console.warn("Aviso al cargar turnos:", err));
+
+    return () => unsub();
+  }, [currentUser]);
+
   // Manejo de búsqueda y pistola de código de barras
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== '') {
@@ -731,6 +770,160 @@ export default function POS() {
     }));
     setEditingItemId(null);
     setEditingItemPrice('');
+  };
+
+  // Handlers para Control de Turno y Movimientos de Caja
+  const handleOpenShift = async (e) => {
+    e.preventDefault();
+    if (activeShift) {
+      alert("Ya existe un turno abierto actualmente. Ciérralo antes de abrir uno nuevo.");
+      return;
+    }
+    const initialCash = Math.max(0, Number(openShiftInitialCash) || 0);
+    const cashier = openShiftCashier.trim() || currentUser.displayName || currentUser.email.split('@')[0];
+
+    setIsSavingShift(true);
+    try {
+      const newShift = {
+        status: 'open',
+        openedAt: serverTimestamp(),
+        openedAtMillis: Date.now(),
+        openedByEmail: currentUser.email,
+        cashierName: cashier,
+        initialCash: initialCash,
+        initialNotes: openShiftNotes.trim() || 'Apertura de turno',
+        movements: [],
+      };
+      await addDoc(collection(db, "cash_shifts"), newShift);
+      soundAlert('beep');
+      setShowOpenShiftModal(false);
+      setOpenShiftNotes('');
+      alert(`✅ Turno abierto con éxito para ${cashier} con fondo inicial de $${initialCash.toFixed(2)}.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al abrir turno: " + (err.message || err));
+    } finally {
+      setIsSavingShift(false);
+    }
+  };
+
+  const handleSaveCashMovement = async (e) => {
+    e.preventDefault();
+    if (!activeShift) {
+      alert("No hay un turno de caja abierto. Abre un turno para registrar movimientos de dinero.");
+      return;
+    }
+    const amount = Number(movementAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor ingresa un monto válido mayor a 0.");
+      return;
+    }
+    if (!movementReason.trim()) {
+      alert("Por favor escribe el motivo o concepto (ej. 'Jabón y bolsas' o 'Feria para dar cambio').");
+      return;
+    }
+
+    setIsSavingMovement(true);
+    try {
+      const cashier = activeShift.cashierName || currentUser.displayName || currentUser.email.split('@')[0];
+      const newMovement = {
+        id: 'mov_' + Date.now(),
+        type: showCashMovementModal, // 'in' or 'out'
+        amount: amount,
+        reason: movementReason.trim(),
+        performedBy: cashier,
+        performedByEmail: currentUser.email,
+        timeMillis: Date.now(),
+        timeFormatted: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      const updatedMovements = [...(activeShift.movements || []), newMovement];
+      await updateDoc(doc(db, "cash_shifts", activeShift.id), {
+        movements: updatedMovements
+      });
+
+      soundAlert('beep');
+      setShowCashMovementModal(null);
+      setMovementAmount('');
+      setMovementReason('');
+      alert(`✅ ${showCashMovementModal === 'in' ? 'Entrada de feria/dinero' : 'Salida de dinero / gasto'} registrada con éxito: $${amount.toFixed(2)}.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar movimiento: " + (err.message || err));
+    } finally {
+      setIsSavingMovement(false);
+    }
+  };
+
+  const handleCloseShift = async (e) => {
+    e.preventDefault();
+    if (!activeShift) return;
+
+    const countedCash = Number(closeShiftCountedCash);
+    if (isNaN(countedCash) || countedCash < 0) {
+      alert("Por favor ingresa la cantidad física contada en caja (mínimo 0).");
+      return;
+    }
+
+    setIsSavingShift(true);
+    try {
+      const shiftStart = activeShift.openedAtMillis || (activeShift.openedAt?.seconds ? activeShift.openedAt.seconds * 1000 : 0);
+      const shiftSales = webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStart);
+
+      const cashSales = shiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      const cardSales = shiftSales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      const transferSales = shiftSales.filter(s => s.paymentMethod === 'transferencia').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      const totalSales = cashSales + cardSales + transferSales;
+
+      const movements = activeShift.movements || [];
+      const totalIn = movements.filter(m => m.type === 'in').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+      const totalOut = movements.filter(m => m.type === 'out').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+
+      const expectedCash = (Number(activeShift.initialCash) || 0) + cashSales + totalIn - totalOut;
+      const difference = countedCash - expectedCash;
+
+      const closedData = {
+        status: 'closed',
+        closedAt: serverTimestamp(),
+        closedAtMillis: Date.now(),
+        closedByEmail: currentUser.email,
+        salesCash: cashSales,
+        salesCard: cardSales,
+        salesTransfer: transferSales,
+        salesTotal: totalSales,
+        salesCount: shiftSales.length,
+        totalIn,
+        totalOut,
+        expectedCash,
+        actualCash: countedCash,
+        difference,
+        closedNotes: closeShiftNotes.trim() || ''
+      };
+
+      await updateDoc(doc(db, "cash_shifts", activeShift.id), closedData);
+
+      soundAlert('success');
+      setShowCloseShiftModal(false);
+      setCloseShiftCountedCash('');
+      setCloseShiftNotes('');
+
+      // Modal de ticket de corte para imprimir
+      const receiptData = {
+        ...activeShift,
+        ...closedData,
+        id: activeShift.id,
+        closedAtMillis: Date.now(),
+        dateOpenedFormatted: new Date(shiftStart).toLocaleString(),
+        dateClosedFormatted: new Date().toLocaleString()
+      };
+      setLastClosedShiftReceipt(receiptData);
+      alert(`🏁 Turno cerrado con éxito. ${difference === 0 ? 'Caja cuadrada exacta.' : (difference > 0 ? `Sobrante de $${difference.toFixed(2)}` : `Faltante de $${Math.abs(difference).toFixed(2)}`)}`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al cerrar turno: " + (err.message || err));
+    } finally {
+      setIsSavingShift(false);
+    }
   };
 
   // Guardar configuración del encabezado y pie del ticket
@@ -859,6 +1052,8 @@ export default function POS() {
         paymentMethod,
         cashGiven: paymentMethod === 'efectivo' ? effectiveCashGiven : ticketTotal,
         change: paymentMethod === 'efectivo' ? effectiveChange : 0,
+        shiftId: activeShift ? activeShift.id : null,
+        cashierName: activeShift?.cashierName || currentUser.displayName || currentUser.email.split('@')[0],
         status: 'entregado',
         type: 'pos',
         createdAt: serverTimestamp(),
@@ -929,31 +1124,75 @@ export default function POS() {
 
   const pendingWebCount = webOrders.filter(o => o.type === 'web' && o.status === 'pendiente').length;
 
-  // Cálculos para Corte de Caja (Hoy)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartMillis = todayStart.getTime();
+  // Cálculos del Turno Activo (para la barra superior y cierre de turno)
+  const shiftStartMillis = activeShift ? (activeShift.openedAtMillis || (activeShift.openedAt?.seconds ? activeShift.openedAt.seconds * 1000 : 0)) : 0;
+  const currentShiftSales = activeShift ? webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStartMillis) : [];
+  const currentShiftCashSales = currentShiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const currentShiftCardSales = currentShiftSales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const currentShiftTransferSales = currentShiftSales.filter(s => s.paymentMethod === 'transferencia').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const currentShiftTotalSales = currentShiftCashSales + currentShiftCardSales + currentShiftTransferSales;
+  const currentShiftMovements = activeShift?.movements || [];
+  const currentShiftTotalIn = currentShiftMovements.filter(m => m.type === 'in').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+  const currentShiftTotalOut = currentShiftMovements.filter(m => m.type === 'out').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+  const currentShiftExpectedCash = activeShift ? ((Number(activeShift.initialCash) || 0) + currentShiftCashSales + currentShiftTotalIn - currentShiftTotalOut) : 0;
+  const currentShiftPiecesCount = currentShiftSales.reduce((acc, s) => acc + (s.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 1), 0), 0);
 
-  const todaySales = webOrders.filter(o => {
+  // Periodos de Fecha para Reportes: Hoy, Semana, Quincena, Mes, Año, Todo
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekStart = now.getTime() - (7 * 24 * 60 * 60 * 1000);
+  const fortnightStart = now.getTime() - (15 * 24 * 60 * 60 * 1000);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+
+  const isOrderInReportPeriod = (o) => {
+    if (o.status === 'cancelado') return false;
     const time = o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0);
-    return time >= todayStartMillis && o.status !== 'cancelado';
+    if (reportDateFilter === 'today') return time >= todayStart;
+    if (reportDateFilter === 'week') return time >= weekStart;
+    if (reportDateFilter === 'fortnight') return time >= fortnightStart;
+    if (reportDateFilter === 'month') return time >= monthStart;
+    if (reportDateFilter === 'year') return time >= yearStart;
+    return true; // 'all'
+  };
+
+  const periodSales = webOrders.filter(isOrderInReportPeriod);
+  const periodPosSales = periodSales.filter(o => o.type === 'pos');
+  const periodWebSales = periodSales.filter(o => o.type === 'web');
+
+  const periodTotal = periodSales.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const periodPosTotal = periodPosSales.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const periodWebTotal = periodWebSales.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+
+  const periodCashTotal = periodSales.filter(o => o.paymentMethod === 'efectivo').reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const periodCardTotal = periodSales.filter(o => o.paymentMethod === 'tarjeta').reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const periodTransferTotal = periodSales.filter(o => o.paymentMethod === 'transferencia').reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const periodPiecesCount = periodSales.reduce((acc, o) => acc + (o.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 1), 0), 0);
+
+  // Movimientos de dinero en el periodo seleccionado (recorriendo turnos del periodo)
+  const periodShifts = shiftsList.filter(s => {
+    const time = s.openedAtMillis || (s.openedAt?.seconds ? s.openedAt.seconds * 1000 : 0);
+    if (reportDateFilter === 'today') return time >= todayStart;
+    if (reportDateFilter === 'week') return time >= weekStart;
+    if (reportDateFilter === 'fortnight') return time >= fortnightStart;
+    if (reportDateFilter === 'month') return time >= monthStart;
+    if (reportDateFilter === 'year') return time >= yearStart;
+    return true;
   });
 
-  const totalPosToday = todaySales.filter(o => o.type === 'pos').reduce((acc, o) => acc + (o.total || 0), 0);
-  const totalWebToday = todaySales.filter(o => o.type === 'web').reduce((acc, o) => acc + (o.total || 0), 0);
-  const totalGeneralToday = totalPosToday + totalWebToday;
+  const periodAllMovements = [];
+  periodShifts.forEach(s => {
+    (s.movements || []).forEach(m => {
+      periodAllMovements.push({ ...m, shiftId: s.id, cashier: s.cashierName });
+    });
+  });
+  periodAllMovements.sort((a, b) => (b.timeMillis || 0) - (a.timeMillis || 0));
 
-  // Ventas filtradas para la tabla de Reporte / Reimpresión
-  const displayedReportSales = webOrders.filter(o => {
-    if (o.status === 'cancelado') return false;
+  const periodMovementsInTotal = periodAllMovements.filter(m => m.type === 'in').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+  const periodMovementsOutTotal = periodAllMovements.filter(m => m.type === 'out').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
 
-    // Filtro por fecha (hoy o todas)
-    if (reportDateFilter === 'today') {
-      const time = o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0);
-      if (time < todayStartMillis) return false;
-    }
-
-    // Filtro por texto de búsqueda (cliente, folio, método, teléfono)
+  // Ventas filtradas con buscador para la tabla
+  const displayedReportSales = periodSales.filter(o => {
     if (reportSearch.trim()) {
       const q = reportSearch.toLowerCase().trim();
       const folio = getOrderFolio(o).toLowerCase();
@@ -963,7 +1202,6 @@ export default function POS() {
       const matchPhone = (o.clientPhone || '').toLowerCase().includes(q);
       if (!matchFolio && !matchClient && !matchMethod && !matchPhone) return false;
     }
-
     return true;
   });
 
@@ -1144,6 +1382,166 @@ export default function POS() {
           </Link>
         </div>
       </header>
+
+      {/* BARRA INFORMATIVA DE TURNO Y CAJA */}
+      {!activeShift ? (
+        <div style={{
+          backgroundColor: 'rgba(234, 179, 8, 0.12)',
+          borderBottom: '1px solid rgba(234, 179, 8, 0.35)',
+          padding: '0.65rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          fontSize: '0.86rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#facc15', fontWeight: 600 }}>
+            <AlertTriangle size={18} />
+            <span>Caja Cerrada (No hay turno activo). Abre el turno con tu fondo de caja para registrar feria, gastos y habilitar el arqueo.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero 1');
+              setOpenShiftInitialCash('500');
+              setOpenShiftNotes('');
+              setShowOpenShiftModal(true);
+            }}
+            style={{
+              backgroundColor: '#10b981',
+              color: '#0f172a',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.45rem 1rem',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+            }}
+          >
+            🟢 Abrir Turno de Caja
+          </button>
+        </div>
+      ) : (
+        <div style={{
+          backgroundColor: '#0f172a',
+          borderBottom: '1px solid #334155',
+          padding: '0.55rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          fontSize: '0.84rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#34d399', fontWeight: 700 }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#34d399', display: 'inline-block' }} />
+              <span>Turno: {activeShift.cashierName}</span>
+            </div>
+            <div style={{ color: '#94a3b8' }}>
+              Fondo Inicial: <strong style={{ color: '#f8fafc' }}>${Number(activeShift.initialCash || 0).toFixed(2)}</strong>
+            </div>
+            <div style={{ color: '#94a3b8' }}>
+              Vtas Efectivo: <strong style={{ color: '#38bdf8' }}>${currentShiftCashSales.toFixed(2)}</strong> ({currentShiftSales.length} vtas)
+            </div>
+            {currentShiftTotalIn > 0 && (
+              <div style={{ color: '#94a3b8' }}>
+                +Feria: <strong style={{ color: '#10b981' }}>+${currentShiftTotalIn.toFixed(2)}</strong>
+              </div>
+            )}
+            {currentShiftTotalOut > 0 && (
+              <div style={{ color: '#94a3b8' }}>
+                -Gastos: <strong style={{ color: '#ef4444' }}>-${currentShiftTotalOut.toFixed(2)}</strong>
+              </div>
+            )}
+            <div style={{ color: '#94a3b8', background: 'rgba(56, 189, 248, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+              Efectivo Esperado en Caja: <strong style={{ color: '#38bdf8', fontSize: '0.92rem' }}>${currentShiftExpectedCash.toFixed(2)} MXN</strong>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setMovementAmount('');
+                setMovementReason('');
+                setShowCashMovementModal('in');
+              }}
+              title="Ingresar feria de tu bolsa para dar cambio"
+              style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: '6px',
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              📥 + Ingresar Feria
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMovementAmount('');
+                setMovementReason('');
+                setShowCashMovementModal('out');
+              }}
+              title="Retirar dinero para gastos (jabón, bolsas, insumos, etc.)"
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '6px',
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              📤 - Registrar Gasto
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCloseShiftCountedCash('');
+                setCloseShiftNotes('');
+                setShowCloseShiftModal(true);
+              }}
+              title="Cerrar turno de caja y realizar arqueo"
+              style={{
+                backgroundColor: '#38bdf8',
+                color: '#0f172a',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              🏁 Corte de Turno
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* CONTENIDO SEGÚN PESTAÑA */}
       {activeTab === 'pos' && (
@@ -2307,167 +2705,627 @@ export default function POS() {
         </div>
       )}
 
-      {/* PESTAÑA: CORTE DE CAJA / REPORTE */}
+      {/* PESTAÑA: CORTE DE CAJA, TURNOS Y FINANZAS */}
       {activeTab === 'report' && (
-        <div className="pos-report-view">
-          <h2 style={{ margin: '0 0 1.5rem 0', fontSize: '1.5rem' }}>Corte de Caja del Día</h2>
+        <div className="pos-report-view" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+          <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
 
-          <div className="pos-stats-grid">
-            <div className="pos-stat-card">
-              <h5>VENTAS TOTALES DE HOY</h5>
-              <div className="stat-num" style={{ color: '#34d399' }}>
-                ${totalGeneralToday.toFixed(2)}
+            {/* ENCABEZADO DE LA SECCIÓN */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ margin: '0 0 0.35rem 0', fontSize: '1.6rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Wallet size={26} /> Control de Turnos, Arqueo de Caja y Finanzas
+                </h2>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>
+                  Apertura y cierre de turnos por empleado, bitácora de feria/gastos e historial de ventas por periodo.
+                </p>
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-                {todaySales.length} transacciones registradas hoy
-              </div>
-            </div>
 
-            <div className="pos-stat-card">
-              <h5>VENTAS EN MOSTRADOR (FÍSICA)</h5>
-              <div className="stat-num">
-                ${totalPosToday.toFixed(2)}
-              </div>
-            </div>
-
-            <div className="pos-stat-card">
-              <h5>VENTAS EN LÍNEA (WEB)</h5>
-              <div className="stat-num" style={{ color: '#fbbf24' }}>
-                ${totalWebToday.toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Historial de Ventas</h3>
-              <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '0.5rem' }}>
-                <button 
-                  onClick={() => setReportDateFilter('today')} 
-                  className={`pos-cat-pill ${reportDateFilter === 'today' ? 'active' : ''}`}
-                  style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}
+              {/* Botón de acción rápida según si el turno está abierto o no */}
+              {!activeShift ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenShiftCashier(currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Cajero 1');
+                    setOpenShiftInitialCash('500');
+                    setOpenShiftNotes('');
+                    setShowOpenShiftModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#10b981',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.65rem 1.25rem',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                  }}
                 >
-                  Ventas de Hoy ({todaySales.length})
+                  🟢 Abrir Turno de Caja
                 </button>
-                <button 
-                  onClick={() => setReportDateFilter('all')} 
-                  className={`pos-cat-pill ${reportDateFilter === 'all' ? 'active' : ''}`}
-                  style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}
-                >
-                  Todas las Ventas ({webOrders.filter(o => o.status !== 'cancelado').length})
-                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMovementAmount('');
+                      setMovementReason('');
+                      setShowCashMovementModal('in');
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      color: '#34d399',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      borderRadius: '6px',
+                      padding: '0.55rem 0.9rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📥 + Ingresar Feria
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMovementAmount('');
+                      setMovementReason('');
+                      setShowCashMovementModal('out');
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '6px',
+                      padding: '0.55rem 0.9rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📤 - Registrar Gasto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCloseShiftCountedCash('');
+                      setCloseShiftNotes('');
+                      setShowCloseShiftModal(true);
+                    }}
+                    style={{
+                      backgroundColor: '#38bdf8',
+                      color: '#0f172a',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.55rem 1rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🏁 Cerrar Turno / Corte
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* TARJETA DEL TURNO ACTUAL / ARQUEO EN VIVO */}
+            {activeShift && (
+              <div style={{
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                border: '1px solid #334155',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                marginBottom: '1.75rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc' }}>
+                      Turno Abierto: <strong style={{ color: '#38bdf8' }}>{activeShift.cashierName}</strong>
+                    </h3>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      (Inició: {activeShift.openedAtMillis ? new Date(activeShift.openedAtMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hoy'})
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    Registrado por: <strong>{activeShift.openedByEmail}</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Fondo Inicial</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', marginTop: '0.25rem' }}>
+                      ${Number(activeShift.initialCash || 0).toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>Monedas y cambio base</div>
+                  </div>
+
+                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Ventas en Efectivo</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.25rem' }}>
+                      ${currentShiftCashSales.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      {currentShiftSales.filter(s => s.paymentMethod === 'efectivo').length} ventas en mostrador
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#10b981', textTransform: 'uppercase', fontWeight: 600 }}>+ Feria de Bolsa</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
+                      +${currentShiftTotalIn.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      {currentShiftMovements.filter(m => m.type === 'in').length} ingresos de cambio
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#ef4444', textTransform: 'uppercase', fontWeight: 600 }}>- Gastos / Salidas</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', marginTop: '0.25rem' }}>
+                      -${currentShiftTotalOut.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      {currentShiftMovements.filter(m => m.type === 'out').length} gastos (jabón, bolsas, etc.)
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Efectivo Esperado</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: '0.25rem' }}>
+                      ${currentShiftExpectedCash.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>Lo que debe haber en el cajón</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SELECTOR DE PERIODO (DÍA, SEMANA, QUINCENA, MES, AÑO, TODAS) */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.25rem',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              backgroundColor: '#1e293b',
+              padding: '0.85rem 1rem',
+              borderRadius: '10px',
+              border: '1px solid #334155'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', marginRight: '0.25rem' }}>
+                  📅 FILTRAR PERIODO:
+                </span>
+                {[
+                  { id: 'today', label: '📅 Hoy' },
+                  { id: 'week', label: '🗓️ Esta Semana (7d)' },
+                  { id: 'fortnight', label: '🌓 Esta Quincena (15d)' },
+                  { id: 'month', label: '📆 Este Mes' },
+                  { id: 'year', label: '📊 Este Año' },
+                  { id: 'all', label: '🌐 Todo el Historial' },
+                ].map(period => (
+                  <button
+                    key={period.id}
+                    type="button"
+                    onClick={() => setReportDateFilter(period.id)}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      backgroundColor: reportDateFilter === period.id ? '#38bdf8' : '#0f172a',
+                      color: reportDateFilter === period.id ? '#0f172a' : '#cbd5e1',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Mostrando <strong style={{ color: '#f8fafc' }}>{periodSales.length}</strong> ventas registradas
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input 
-                type="text" 
-                placeholder="Buscar por cliente o folio..." 
-                value={reportSearch} 
-                onChange={(e) => setReportSearch(e.target.value)} 
-                className="pos-input-sm"
-                style={{ width: '220px', padding: '0.45rem 0.7rem' }}
-              />
+            {/* TARJETAS DE MÉTRICAS DEL PERIODO */}
+            <div className="pos-stats-grid" style={{ marginBottom: '1.75rem' }}>
+              <div className="pos-stat-card">
+                <h5>VENTAS TOTALES DEL PERIODO</h5>
+                <div className="stat-num" style={{ color: '#34d399' }}>
+                  ${periodTotal.toFixed(2)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.4rem' }}>
+                  Mostrador: <strong>${periodPosTotal.toFixed(2)}</strong> • Web: <strong>${periodWebTotal.toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <div className="pos-stat-card">
+                <h5>VENTAS EN EFECTIVO</h5>
+                <div className="stat-num" style={{ color: '#38bdf8' }}>
+                  ${periodCashTotal.toFixed(2)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.4rem' }}>
+                  Cobrado en caja física
+                </div>
+              </div>
+
+              <div className="pos-stat-card">
+                <h5>TARJETA Y TRANSFERENCIA</h5>
+                <div className="stat-num" style={{ color: '#fbbf24' }}>
+                  ${(periodCardTotal + periodTransferTotal).toFixed(2)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.4rem' }}>
+                  Tarjeta: ${periodCardTotal.toFixed(2)} • Transf: ${periodTransferTotal.toFixed(2)}
+                </div>
+              </div>
+
+              <div className="pos-stat-card">
+                <h5>MOVIMIENTOS DE CAJA</h5>
+                <div className="stat-num" style={{ color: '#cbd5e1', fontSize: '1.3rem' }}>
+                  <span style={{ color: '#10b981' }}>+${periodMovementsInTotal.toFixed(2)}</span> / <span style={{ color: '#ef4444' }}>-${periodMovementsOutTotal.toFixed(2)}</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.4rem' }}>
+                  Feria agregada vs Gastos menores
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div style={{ background: '#1e293b', borderRadius: '8px', border: '1px solid #334155', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-              <thead>
-                <tr style={{ background: '#0f172a', borderBottom: '1px solid #334155', color: '#94a3b8' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Folio</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Fecha/Hora</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Tipo</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Cliente</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Método</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ticket</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedReportSales.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                      No se encontraron ventas para este filtro o búsqueda.
-                    </td>
-                  </tr>
-                ) : (
-                  displayedReportSales.map(sale => {
-                    const time = sale.createdAt?.seconds 
-                      ? new Date(sale.createdAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
-                      : (sale.createdAtMillis ? new Date(sale.createdAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '--:--');
+            {/* SUBPESTAÑAS DE TABLAS: VENTAS, MOVIMIENTOS Y TURNOS */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '2px solid #334155', paddingBottom: '0.5rem', width: '100%', maxWidth: '600px' }}>
+                <button
+                  type="button"
+                  onClick={() => setReportSubTab('sales')}
+                  style={{
+                    background: reportSubTab === 'sales' ? '#38bdf8' : 'transparent',
+                    color: reportSubTab === 'sales' ? '#0f172a' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  📋 Ventas del Periodo ({displayedReportSales.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportSubTab('movements')}
+                  style={{
+                    background: reportSubTab === 'movements' ? '#38bdf8' : 'transparent',
+                    color: reportSubTab === 'movements' ? '#0f172a' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  💸 Feria y Gastos ({periodAllMovements.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportSubTab('shifts')}
+                  style={{
+                    background: reportSubTab === 'shifts' ? '#38bdf8' : 'transparent',
+                    color: reportSubTab === 'shifts' ? '#0f172a' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  📑 Historial de Turnos ({periodShifts.length})
+                </button>
+              </div>
 
-                    return (
-                      <tr key={sale.id} style={{ borderBottom: '1px solid #334155' }}>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <span style={{ 
-                            fontFamily: 'monospace', 
-                            fontWeight: 700, 
-                            color: '#38bdf8', 
-                            background: 'rgba(56, 189, 248, 0.12)', 
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            padding: '0.2rem 0.5rem', 
-                            borderRadius: '4px',
-                            fontSize: '0.85rem'
-                          }}>
-                            {getOrderFolio(sale)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{time}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <span style={{
-                            padding: '0.2rem 0.5rem',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            backgroundColor: sale.type === 'pos' ? 'rgba(56,189,248,0.2)' : 'rgba(251,191,36,0.2)',
-                            color: sale.type === 'pos' ? '#38bdf8' : '#fbbf24'
-                          }}>
-                            {sale.type === 'pos' ? 'Mostrador' : 'Web'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{sale.clientName}</td>
-                        <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>{sale.paymentMethod || 'Web'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#34d399' }}>
-                          ${(sale.total || 0).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
-                            <button 
-                              onClick={() => openReceiptModal(sale)}
-                              className="pos-btn-reprint"
-                              title="Reimprimir ticket de esta compra"
-                            >
-                              <Printer size={13} /> Reimprimir
-                            </button>
-                            {isAdmin && (
-                              <button 
-                                onClick={() => handleDeleteSale(sale)}
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.12)',
-                                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                                  color: '#ef4444',
-                                  borderRadius: '5px',
-                                  padding: '0.3rem 0.55rem',
-                                  fontSize: '0.78rem',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}
-                                title="Borrar registro de venta (Solo Administrador)"
-                              >
-                                <Trash2 size={13} /> Borrar
-                              </button>
-                            )}
-                          </div>
+              {reportSubTab === 'sales' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por cliente, folio o método..." 
+                    value={reportSearch} 
+                    onChange={(e) => setReportSearch(e.target.value)} 
+                    className="pos-input-sm"
+                    style={{ width: '250px', padding: '0.5rem 0.8rem', borderRadius: '6px' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 1. SUBTAB: VENTAS DEL PERIODO */}
+            {reportSubTab === 'sales' && (
+              <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Folio</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Fecha/Hora</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Canal</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Cajero / Cliente</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Método</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedReportSales.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No se encontraron ventas para el periodo o búsqueda seleccionada.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      displayedReportSales.map(sale => {
+                        const time = sale.createdAt?.seconds 
+                          ? new Date(sale.createdAt.seconds * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
+                          : (sale.createdAtMillis ? new Date(sale.createdAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '--:--');
+
+                        return (
+                          <tr key={sale.id} style={{ borderBottom: '1px solid #334155' }}>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{ 
+                                fontFamily: 'monospace', 
+                                fontWeight: 700, 
+                                color: '#38bdf8', 
+                                background: 'rgba(56, 189, 248, 0.12)', 
+                                border: '1px solid rgba(56, 189, 248, 0.3)',
+                                padding: '0.2rem 0.5rem', 
+                                borderRadius: '4px',
+                                fontSize: '0.82rem'
+                              }}>
+                                {getOrderFolio(sale)}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem' }}>{time}</td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: sale.type === 'pos' ? 'rgba(56,189,248,0.15)' : 'rgba(251,191,36,0.15)',
+                                color: sale.type === 'pos' ? '#38bdf8' : '#fbbf24',
+                                border: `1px solid ${sale.type === 'pos' ? 'rgba(56,189,248,0.3)' : 'rgba(251,191,36,0.3)'}`
+                              }}>
+                                {sale.type === 'pos' ? '🏬 Mostrador' : '🌐 Web'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <div style={{ fontWeight: 600, color: '#f8fafc' }}>{sale.clientName}</div>
+                              {sale.cashierName && (
+                                <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                  Atendió: {sale.cashierName}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
+                              <span style={{
+                                backgroundColor: sale.paymentMethod === 'efectivo' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(147, 51, 234, 0.15)',
+                                color: sale.paymentMethod === 'efectivo' ? '#34d399' : '#c084fc',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                fontSize: '0.78rem'
+                              }}>
+                                {sale.paymentMethod || 'Web'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#34d399', fontSize: '0.95rem' }}>
+                              ${(Number(sale.total) || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button 
+                                  onClick={() => openReceiptModal(sale)}
+                                  className="pos-btn-reprint"
+                                  title="Reimprimir ticket de esta compra"
+                                >
+                                  <Printer size={13} /> Reimprimir
+                                </button>
+                                {isAdmin && (
+                                  <button 
+                                    onClick={() => handleDeleteSale(sale)}
+                                    style={{
+                                      background: 'rgba(239, 68, 68, 0.12)',
+                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      color: '#ef4444',
+                                      borderRadius: '5px',
+                                      padding: '0.3rem 0.55rem',
+                                      fontSize: '0.78rem',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
+                                    }}
+                                    title="Borrar registro de venta (Solo Administrador)"
+                                  >
+                                    <Trash2 size={13} /> Borrar
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 2. SUBTAB: MOVIMIENTOS DE CAJA (FERIA Y GASTOS) */}
+            {reportSubTab === 'movements' && (
+              <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Hora / Fecha</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Tipo</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Monto</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Concepto / Motivo</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Registró</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodAllMovements.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No hay entradas de feria ni retiros de gastos registrados en este periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      periodAllMovements.map((mov, idx) => {
+                        const isEntry = mov.type === 'in';
+                        return (
+                          <tr key={mov.id || idx} style={{ borderBottom: '1px solid #334155' }}>
+                            <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
+                              {mov.timeMillis ? new Date(mov.timeMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : mov.timeFormatted || 'Hoy'}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: isEntry ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                color: isEntry ? '#34d399' : '#ef4444',
+                                border: `1px solid ${isEntry ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
+                              }}>
+                                {isEntry ? '📥 + Entrada (Feria)' : '📤 - Salida (Gasto)'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontWeight: 800, fontSize: '0.95rem', color: isEntry ? '#34d399' : '#ef4444' }}>
+                              {isEntry ? '+' : '-'}${Number(mov.amount || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#f8fafc', fontWeight: 500 }}>
+                              {mov.reason}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#94a3b8' }}>
+                              👤 {mov.performedBy || mov.cashier || 'Cajero'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 3. SUBTAB: HISTORIAL DE TURNOS Y CORTES */}
+            {reportSubTab === 'shifts' && (
+              <div style={{ background: '#1e293b', borderRadius: '10px', border: '1px solid #334155', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0f172a', borderBottom: '2px solid #334155', color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Cajero / Turno</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Apertura</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Cierre</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Fondo</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ventas Efectivo</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Esperado</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Físico</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Diferencia</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ticket</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodShifts.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No hay turnos registrados en este periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      periodShifts.map((sh) => {
+                        const isOpen = sh.status === 'open';
+                        const openDate = sh.openedAtMillis ? new Date(sh.openedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Hoy';
+                        const closeDate = sh.closedAtMillis ? new Date(sh.closedAtMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : (isOpen ? '🟢 En Curso' : 'Cerrado');
+                        const diff = Number(sh.difference || 0);
+
+                        return (
+                          <tr key={sh.id} style={{ borderBottom: '1px solid #334155' }}>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <strong style={{ color: '#f8fafc' }}>{sh.cashierName}</strong>
+                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{sh.openedByEmail}</div>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{openDate}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: isOpen ? '#34d399' : '#cbd5e1' }}>{closeDate}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>${Number(sh.initialCash || 0).toFixed(2)}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#38bdf8', fontWeight: 700 }}>
+                              ${Number(sh.salesCash || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700 }}>
+                              ${Number(sh.expectedCash || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#f8fafc' }}>
+                              {isOpen ? '--' : `$${Number(sh.actualCash || 0).toFixed(2)}`}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                              {isOpen ? (
+                                <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem', fontWeight: 700 }}>
+                                  🟢 Abierto
+                                </span>
+                              ) : (
+                                <span style={{
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  backgroundColor: diff === 0 ? 'rgba(52, 211, 153, 0.15)' : (diff > 0 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+                                  color: diff === 0 ? '#34d399' : (diff > 0 ? '#38bdf8' : '#ef4444')
+                                }}>
+                                  {diff === 0 ? 'Exacto $0.00' : (diff > 0 ? `+Sobrante $${diff.toFixed(2)}` : `-Faltante $${Math.abs(diff).toFixed(2)}`)}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                              {!isOpen ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLastClosedShiftReceipt({
+                                      ...sh,
+                                      dateOpenedFormatted: openDate,
+                                      dateClosedFormatted: closeDate
+                                    });
+                                  }}
+                                  className="pos-btn-reprint"
+                                  title="Ver e imprimir ticket de corte de este turno"
+                                >
+                                  <Printer size={13} /> Ticket Corte
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>En curso</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
           </div>
         </div>
       )}
@@ -3420,6 +4278,527 @@ export default function POS() {
           onClose={() => setShowQuickEntryModal(false)}
           categories={categories.filter(c => c !== 'Todos')}
         />
+      )}
+
+      {/* 1. MODAL: APERTURA DE TURNO DE CAJA */}
+      {showOpenShiftModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999, padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid #334155',
+            maxWidth: '440px', width: '100%', padding: '1.75rem', color: '#fff',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🟢 Apertura de Turno de Caja
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowOpenShiftModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleOpenShift} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Nombre del Cajero / Empleado
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={openShiftCashier}
+                  onChange={(e) => setOpenShiftCashier(e.target.value)}
+                  placeholder="Ej. Juan Pérez / Empleada 1"
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#38bdf8', marginBottom: '0.35rem', fontWeight: 700 }}>
+                  Fondo Inicial de Caja en Efectivo ($ MXN)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  value={openShiftInitialCash}
+                  onChange={(e) => setOpenShiftInitialCash(e.target.value)}
+                  placeholder="500.00"
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderColor: '#38bdf8', fontSize: '1.1rem', fontWeight: 800 }}
+                />
+                <span style={{ fontSize: '0.74rem', color: '#94a3b8', display: 'block', marginTop: '0.25rem' }}>
+                  Dinero en monedas y billetes chicos con el que arranca el turno.
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Notas u Observaciones (Opcional)
+                </label>
+                <textarea
+                  value={openShiftNotes}
+                  onChange={(e) => setOpenShiftNotes(e.target.value)}
+                  placeholder="Ej. Se reciben 10 monedas de $10 y 4 billetes de $50..."
+                  rows={2}
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowOpenShiftModal(false)}
+                  className="pos-btn-secondary"
+                  style={{ flex: 1, padding: '0.75rem' }}
+                  disabled={isSavingShift}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="pos-btn-pay"
+                  style={{ flex: 1, padding: '0.75rem', backgroundColor: '#10b981', color: '#0f172a', fontWeight: 800 }}
+                  disabled={isSavingShift}
+                >
+                  {isSavingShift ? 'Abriendo...' : 'Iniciar Turno'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. MODAL: MOVIMIENTO DE CAJA (ENTRADA DE FERIA O GASTO/RETIRO) */}
+      {showCashMovementModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999, padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid #334155',
+            maxWidth: '440px', width: '100%', padding: '1.75rem', color: '#fff',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{
+                margin: 0, fontSize: '1.2rem',
+                color: showCashMovementModal === 'in' ? '#34d399' : '#ef4444',
+                display: 'flex', alignItems: 'center', gap: '0.5rem'
+              }}>
+                {showCashMovementModal === 'in' ? '📥 Ingresar Feria / Dinero a Caja' : '📤 Retirar Dinero / Registrar Gasto'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCashMovementModal(null)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              backgroundColor: showCashMovementModal === 'in' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${showCashMovementModal === 'in' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              borderRadius: '8px',
+              padding: '0.75rem',
+              fontSize: '0.8rem',
+              color: showCashMovementModal === 'in' ? '#34d399' : '#f87171',
+              marginBottom: '1rem'
+            }}>
+              {showCashMovementModal === 'in'
+                ? '💡 Usa esta opción para agregar dinero de tu bolsa para feria/cambio. Se sumará al total esperado en caja.'
+                : '💡 Usa esta opción al sacar dinero del cajón para jabón, bolsas, insumos, etc. Se restará del total para no generar faltante.'
+              }
+            </div>
+
+            <form onSubmit={handleSaveCashMovement} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Monto en Efectivo ($ MXN)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.5"
+                  required
+                  autoFocus
+                  value={movementAmount}
+                  onChange={(e) => setMovementAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="pos-input"
+                  style={{
+                    width: '100%', padding: '0.65rem 0.85rem',
+                    fontSize: '1.15rem', fontWeight: 800,
+                    borderColor: showCashMovementModal === 'in' ? '#34d399' : '#ef4444'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Concepto / Motivo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={movementReason}
+                  onChange={(e) => setMovementReason(e.target.value)}
+                  placeholder={showCashMovementModal === 'in' ? "Ej. Cambio de $200 en billetes chicos y monedas" : "Ej. Compra de jabón y bolsas para entrega"}
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCashMovementModal(null)}
+                  className="pos-btn-secondary"
+                  style={{ flex: 1, padding: '0.75rem' }}
+                  disabled={isSavingMovement}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1, padding: '0.75rem',
+                    backgroundColor: showCashMovementModal === 'in' ? '#10b981' : '#ef4444',
+                    color: '#fff', border: 'none', borderRadius: '6px',
+                    fontWeight: 800, cursor: 'pointer'
+                  }}
+                  disabled={isSavingMovement}
+                >
+                  {isSavingMovement ? 'Guardando...' : (showCashMovementModal === 'in' ? 'Registrar Feria' : 'Registrar Gasto')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. MODAL: CIERRE DE TURNO Y ARQUEO DE CAJA */}
+      {showCloseShiftModal && activeShift && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999, padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid #334155',
+            maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+            padding: '1.75rem', color: '#fff', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🏁 Cierre de Turno y Arqueo
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Cajero: <strong>{activeShift.cashierName}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCloseShiftModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Desglose de cuentas en el turno */}
+            <div style={{
+              backgroundColor: '#0f172a', borderRadius: '10px', border: '1px solid #334155',
+              padding: '1rem', marginBottom: '1.25rem', fontSize: '0.85rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#cbd5e1' }}>
+                <span>Fondo Inicial de Caja:</span>
+                <strong>+${Number(activeShift.initialCash || 0).toFixed(2)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#38bdf8' }}>
+                <span>(+) Ventas Mostrador en Efectivo:</span>
+                <strong>+${currentShiftCashSales.toFixed(2)}</strong>
+              </div>
+              {currentShiftTotalIn > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#10b981' }}>
+                  <span>(+) Entradas de Feria de Bolsa:</span>
+                  <strong>+${currentShiftTotalIn.toFixed(2)}</strong>
+                </div>
+              )}
+              {currentShiftTotalOut > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#ef4444' }}>
+                  <span>(-) Salidas / Gastos (jabón, bolsas, etc.):</span>
+                  <strong>-${currentShiftTotalOut.toFixed(2)}</strong>
+                </div>
+              )}
+
+              <div style={{ borderTop: '2px solid #334155', margin: '0.6rem 0', paddingTop: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>(=) Efectivo Esperado en el Cajón:</strong>
+                <strong style={{ fontSize: '1.2rem', color: '#38bdf8' }}>
+                  ${currentShiftExpectedCash.toFixed(2)} MXN
+                </strong>
+              </div>
+
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.4rem', borderTop: '1px dashed #334155', paddingTop: '0.4rem' }}>
+                Otras ventas del turno: Tarjeta: ${currentShiftCardSales.toFixed(2)} | Transf: ${currentShiftTransferSales.toFixed(2)} | Total piezas: {currentShiftPiecesCount} pzs
+              </div>
+            </div>
+
+            <form onSubmit={handleCloseShift} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#f8fafc', marginBottom: '0.35rem', fontWeight: 700 }}>
+                  💵 Efectivo Físico Contado en el Cajón ($ MXN)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  autoFocus
+                  value={closeShiftCountedCash}
+                  onChange={(e) => setCloseShiftCountedCash(e.target.value)}
+                  placeholder="Cuenta tus billetes y monedas y anótalo aquí..."
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.75rem', fontSize: '1.2rem', fontWeight: 800, borderColor: '#38bdf8' }}
+                />
+              </div>
+
+              {/* Cálculo en vivo de la diferencia */}
+              {closeShiftCountedCash !== '' && !isNaN(Number(closeShiftCountedCash)) && (() => {
+                const diff = Number(closeShiftCountedCash) - currentShiftExpectedCash;
+                const isExact = Math.abs(diff) < 0.01;
+                const isSurplus = diff > 0.01;
+                return (
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    backgroundColor: isExact ? 'rgba(52, 211, 153, 0.15)' : (isSurplus ? 'rgba(56, 189, 248, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+                    border: `1px solid ${isExact ? '#34d399' : (isSurplus ? '#38bdf8' : '#ef4444')}`,
+                    color: isExact ? '#34d399' : (isSurplus ? '#38bdf8' : '#ef4444'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span>
+                      {isExact ? '✅ Caja Cuadrada Exacta' : (isSurplus ? '🔵 Sobrante en Caja:' : '🔴 Faltante en Caja:')}
+                    </span>
+                    <span style={{ fontSize: '1.1rem' }}>
+                      {isExact ? '$0.00' : (isSurplus ? `+$${diff.toFixed(2)}` : `-$${Math.abs(diff).toFixed(2)}`)}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  Notas Finales de Entrega de Turno
+                </label>
+                <textarea
+                  value={closeShiftNotes}
+                  onChange={(e) => setCloseShiftNotes(e.target.value)}
+                  placeholder="Ej. Se dejan $500 de fondo para el turno de la tarde y el resto se guarda en el sobre..."
+                  rows={2}
+                  className="pos-input"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCloseShiftModal(false)}
+                  className="pos-btn-secondary"
+                  style={{ flex: 1, padding: '0.75rem' }}
+                  disabled={isSavingShift}
+                >
+                  Regresar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1, padding: '0.75rem',
+                    backgroundColor: '#38bdf8', color: '#0f172a',
+                    border: 'none', borderRadius: '6px',
+                    fontWeight: 800, cursor: 'pointer'
+                  }}
+                  disabled={isSavingShift}
+                >
+                  {isSavingShift ? 'Cerrando...' : 'Confirmar Corte y Cerrar Turno'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MODAL DE IMPRESIÓN DE TICKET DE CORTE DE CAJA (ARQUEO / CORTE Z) */}
+      {lastClosedShiftReceipt && (
+        <div className="pos-receipt-modal" onClick={() => setLastClosedShiftReceipt(null)}>
+          <div className="pos-receipt-box" onClick={(e) => e.stopPropagation()}>
+            {/* TICKET IMPRESO */}
+            <div id="printable-shift-receipt" style={{
+              fontFamily: '"Courier New", Courier, monospace',
+              fontSize: '12px',
+              lineHeight: '1.35',
+              color: '#000',
+              padding: '10px',
+              backgroundColor: '#fff',
+              borderRadius: '4px',
+              boxShadow: '0 0 10px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <div style={{ fontWeight: 900, fontSize: '15px' }}>{ticketConfig.storeName || 'TIENDA ALINA'}</div>
+                <div style={{ fontSize: '11px', color: '#333' }}>{ticketConfig.storeSubtitle || 'Jiménez American Style'}</div>
+                <div style={{ fontSize: '10px', color: '#555' }}>{ticketConfig.storeAddress}</div>
+                <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
+                <div style={{ fontWeight: 900, fontSize: '13px' }}>CORTE DE CAJA / CAMBIO DE TURNO</div>
+                <div style={{ fontSize: '11px', fontWeight: 700 }}>FOLIO CORTE: {lastClosedShiftReceipt.id?.slice(-8).toUpperCase() || 'TURNO'}</div>
+              </div>
+
+              <div style={{ fontSize: '11px', marginBottom: '6px' }}>
+                <div><strong>Cajero:</strong> {lastClosedShiftReceipt.cashierName}</div>
+                <div><strong>Apertura:</strong> {lastClosedShiftReceipt.dateOpenedFormatted}</div>
+                <div><strong>Cierre:</strong> {lastClosedShiftReceipt.dateClosedFormatted}</div>
+              </div>
+
+              <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
+
+              <div style={{ fontSize: '11px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Fondo Inicial:</span>
+                  <span>${Number(lastClosedShiftReceipt.initialCash || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>(+) Ventas Efectivo:</span>
+                  <span>+${Number(lastClosedShiftReceipt.salesCash || 0).toFixed(2)}</span>
+                </div>
+                {Number(lastClosedShiftReceipt.totalIn || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>(+) Entradas de Feria:</span>
+                    <span>+${Number(lastClosedShiftReceipt.totalIn).toFixed(2)}</span>
+                  </div>
+                )}
+                {Number(lastClosedShiftReceipt.totalOut || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>(-) Gastos / Salidas:</span>
+                    <span>-${Number(lastClosedShiftReceipt.totalOut).toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div style={{ borderBottom: '1px solid #000', margin: '4px 0' }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '12px' }}>
+                  <span>(=) TOTAL ESPERADO:</span>
+                  <span>${Number(lastClosedShiftReceipt.expectedCash || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '12px' }}>
+                  <span>EFECTIVO CONTADO:</span>
+                  <span>${Number(lastClosedShiftReceipt.actualCash || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '12px', marginTop: '2px' }}>
+                  <span>DIFERENCIA:</span>
+                  <span>
+                    {Number(lastClosedShiftReceipt.difference || 0) === 0
+                      ? 'EXACTO $0.00'
+                      : (Number(lastClosedShiftReceipt.difference) > 0 ? `+SOBRANTE $${Number(lastClosedShiftReceipt.difference).toFixed(2)}` : `-FALTANTE $${Math.abs(Number(lastClosedShiftReceipt.difference)).toFixed(2)}`)}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
+
+              <div style={{ fontSize: '10px' }}>
+                <div><strong>OTRAS FORMAS DE PAGO:</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Tarjeta:</span>
+                  <span>${Number(lastClosedShiftReceipt.salesCard || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Transferencia:</span>
+                  <span>${Number(lastClosedShiftReceipt.salesTransfer || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px dotted #888', paddingTop: '2px', marginTop: '2px' }}>
+                  <span>TOTAL GENERAL VENDIDO:</span>
+                  <span>${Number(lastClosedShiftReceipt.salesTotal || 0).toFixed(2)}</span>
+                </div>
+                <div>Prendas vendidas en turno: {lastClosedShiftReceipt.salesCount || 0} transacciones</div>
+              </div>
+
+              {/* Desglose de movimientos si hubo */}
+              {Array.isArray(lastClosedShiftReceipt.movements) && lastClosedShiftReceipt.movements.length > 0 && (
+                <>
+                  <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
+                  <div style={{ fontSize: '10px' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '2px' }}>DETALLE DE MOVIMIENTOS:</div>
+                    {lastClosedShiftReceipt.movements.map((m, mi) => (
+                      <div key={mi} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '1px' }}>
+                        <span>{m.type === 'in' ? '[+]' : '[-]'} {m.reason?.slice(0, 22)}</span>
+                        <span>${Number(m.amount).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {lastClosedShiftReceipt.closedNotes && (
+                <div style={{ fontSize: '10px', marginTop: '6px', fontStyle: 'italic' }}>
+                  Nota: {lastClosedShiftReceipt.closedNotes}
+                </div>
+              )}
+
+              <div style={{ marginTop: '25px', textAlign: 'center', fontSize: '10px' }}>
+                <div style={{ borderTop: '1px solid #000', width: '80%', margin: '0 auto 4px auto' }} />
+                <div>Firma Cajero Saliente</div>
+                <div style={{ marginTop: '20px', borderTop: '1px solid #000', width: '80%', margin: '20px auto 4px auto' }} />
+                <div>Firma Receptor / Dueño</div>
+              </div>
+            </div>
+
+            {/* BOTONES DE ACCIÓN */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setLastClosedShiftReceipt(null)}
+                style={{
+                  flex: 1, padding: '0.65rem', backgroundColor: '#e2e8f0',
+                  color: '#0f172a', border: 'none', borderRadius: '6px',
+                  fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                style={{
+                  flex: 1, padding: '0.65rem', backgroundColor: '#10b981',
+                  color: '#0f172a', border: 'none', borderRadius: '6px',
+                  fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
+                }}
+              >
+                <Printer size={16} /> Imprimir Ticket de Corte
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

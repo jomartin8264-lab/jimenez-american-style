@@ -853,4 +853,37 @@
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
+/* Reglas de impresión para Tickets de Venta y Tickets de Corte de Turno */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .pos-receipt-modal,
+  .pos-receipt-modal * {
+    visibility: visible;
+  }
+  .pos-receipt-modal {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .pos-receipt-box {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    background: transparent !important;
+  }
+  .pos-receipt-modal button,
+  .pos-receipt-modal .no-print {
+    display: none !important;
+  }
+}
+
 

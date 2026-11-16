@@ -201,6 +201,17 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Mostrador POS (`POS.jsx`):** La cuadrícula de cobro rápido de mostrador filtra automáticamente las prendas agotadas para evitar selecciones de prendas inexistentes.
 * **Reactivación Automática desde Inventario:** En la pestaña **`📦 Inventario`** del POS y en `/admin`, todos los productos agotados siguen visibles y filtrables. En cuanto el encargado pulsa `[+]` o edita el stock a 1 o más, la prenda reaparece de inmediato tanto en el mostrador de caja como en la página web pública en tiempo real sin recargar.
 
+### P. Control de Turnos por Empleado, Movimientos de Caja (Feria y Gastos) y Arqueo
+* **Apertura de Turno:** Al iniciar jornada o cambio de empleado, se registra el nombre del cajero y el fondo inicial de monedas/cambio (`initialCash`, ej. $500).
+* **Barra Informativa en Tiempo Real:** En el encabezado del POS muestra el cajero en turno, fondo, ventas en efectivo, feria agregada, gastos y el dinero exacto que debe haber en el cajón.
+* **📥 Ingreso de Feria / Aporte de Bolsa:** Botón para inyectar cambio de dinero personal cuando falta feria. Se suma automáticamente al arqueo con motivo, fecha y cajero.
+* **📤 Retiro de Efectivo / Gastos Menores:** Botón para registrar compras de insumos de la tienda (jabón, bolsas, garrafón, etc.). Se resta de la caja justificando la salida para no generar falsos faltantes.
+* **🏁 Cierre de Turno y Arqueo (Corte Z):** Fórmula `Fondo Inicial + Ventas Efectivo + Entradas Feria - Gastos`. El cajero cuenta el dinero físico, lo anota y el sistema calcula la diferencia en vivo: `✅ Exacto ($0.00)`, `🔵 Sobrante` o `🔴 Faltante`.
+* **Ticket de Corte Térmico Imprimible:** Genera comprobante con desglose de efectivo, tarjeta, transferencia, lista de gastos/feria y líneas de firma para cajero saliente y receptor.
+* **Filtros Financieros por Periodo:** En la pestaña `Corte de Caja` permite alternar en 1 clic entre **Hoy**, **Esta Semana (7d)**, **Esta Quincena (15d)**, **Este Mes**, **Este Año** y **Historial Completo**.
+* **Subpestañas de Reporte:** Desglose en 3 vistas: `📋 Ventas del Periodo`, `💸 Feria y Gastos (Movimientos)`, y `📑 Historial de Turnos y Cortes`.
+* **Eficiencia en Plan Spark (Firebase):** Todos los cálculos, sumas y filtros se realizan en la memoria del navegador. Consumo adicional de lecturas: **0**. Totalmente gratis y ligero.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
