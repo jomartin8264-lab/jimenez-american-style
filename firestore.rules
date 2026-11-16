@@ -9,27 +9,33 @@ service cloud.firestore {
              get(/databases/$(database)/documents/config/admins).data.emails.hasAny([request.auth.token.email]);
     }
 
-    // PRODUCTOS: Todos pueden ver. Personal autorizado crea/actualiza; SOLO Administradores pueden eliminar prendas
+    // PRODUCTOS: Todos pueden ver el catálogo. Personal autorizado crea/modifica; SOLO Administradores pueden eliminar
     match /products/{productId} {
       allow read: if true;
       allow create, update: if request.auth != null;
       allow delete: if isAdmin();
     }
 
-    // PEDIDOS / VENTAS: Cualquiera crea; Personal autorizado lee/actualiza; SOLO Administradores pueden eliminar ventas
+    // PEDIDOS Y VENTAS: Clientes crean compras web; Empleados y Admins leen/cobran; SOLO Administradores pueden eliminar ventas
     match /orders/{orderId} {
       allow create: if true;
       allow read, update: if request.auth != null;
       allow delete: if isAdmin();
     }
 
-    // CONFIGURACIÓN DE CONTADORES: Personal autenticado puede incrementar contadores de folios y SKUs
+    // TURNOS Y CORTES DE CAJA: Cualquier empleado o administrador puede abrir turno, registrar feria/gastos y cerrar turno
+    match /cash_shifts/{shiftId} {
+      allow read, create, update: if request.auth != null;
+      allow delete: if isAdmin();
+    }
+
+    // CONTADORES ATÓMICOS: Personal autenticado puede incrementar los números consecutivos de folios y SKUs
     match /config/counters {
       allow read: if true;
       allow write: if request.auth != null;
     }
 
-    // OTRAS CONFIGURACIONES: Todos pueden leer, solo Administradores pueden modificar
+    // CONFIGURACIÓN DE TIENDA: Todos pueden leer (para ver contacto/categorías), solo Administradores pueden editar
     match /config/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
