@@ -388,8 +388,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const pendingProducts = products.filter(p => !p.labeled);
   const labeledProducts = products.filter(p => p.labeled === true);
 
-  // Formato de hoja: 'opalina10' (10 etiquetas colgantes 5x2), '24' (3x8) o '30' (3x10)
+  // Formato de hoja: 'opalina15' (15 etiquetas 5x3), 'opalina10' (10 etiquetas 5x2), '24' (3x8) o '30' (3x10)
   const [sheetLayout, setSheetLayout] = useState('opalina15');
+  const isOpalina = sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
 
   // Pestaña de filtro activa: 'pending' (solo pendientes), 'all' (todo el catálogo), 'labeled' (ya etiquetadas)
   const [filterTab, setFilterTab] = useState(() => pendingProducts.length > 0 ? 'pending' : 'all');
