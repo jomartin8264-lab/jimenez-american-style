@@ -255,9 +255,9 @@ h1, h2, h3, h4, h5, h6 {
   body.batch-printing-active .batch-print-page {
     box-sizing: border-box !important;
     width: 100% !important;
-    max-width: 185mm !important;
+    max-width: 190mm !important;
     height: auto !important;
-    max-height: 220mm !important;
+    max-height: 245mm !important;
     margin: 0 auto !important;
     overflow: hidden !important;
     page-break-inside: avoid !important;

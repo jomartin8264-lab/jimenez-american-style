@@ -43,7 +43,7 @@ function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   );
 }
 
-function OpalinaHangtagItem({ item, sheetLayout = 'opalina9', isPrint = false }) {
+function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }) {
   if (item.isBlank) {
     return (
       <div 
@@ -52,7 +52,7 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina9', isPrint = false })
           border: isPrint ? 'none' : '1px dashed #cbd5e1', 
           visibility: isPrint ? 'hidden' : 'visible',
           height: '100%',
-          minHeight: isPrint ? (sheetLayout === 'opalina10' ? '98mm' : (sheetLayout === 'opalina9' ? '68mm' : '48mm')) : '200px',
+          minHeight: isPrint ? (sheetLayout === 'opalina10' ? '98mm' : (sheetLayout === 'opalina9' ? '68mm' : '48mm')) : '190px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -67,14 +67,15 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina9', isPrint = false })
 
   const isOpalina10 = sheetLayout === 'opalina10';
   const isOpalina9 = sheetLayout === 'opalina9';
+  const isOpalina20 = sheetLayout === 'opalina20';
   const itemSize = (item.size || '').toUpperCase().trim();
 
   const logoSize = isPrint 
-    ? (isOpalina10 ? '28mm' : (isOpalina9 ? '21mm' : '14mm'))
-    : (isOpalina10 ? '82px' : (isOpalina9 ? '72px' : '52px'));
+    ? (isOpalina10 ? '28mm' : (isOpalina9 ? '21mm' : (isOpalina20 ? '13mm' : '16mm')))
+    : (isOpalina10 ? '82px' : (isOpalina9 ? '72px' : (isOpalina20 ? '48px' : '58px')));
 
   const barcodeH = isPrint 
-    ? (isOpalina10 ? 11 : (isOpalina9 ? 8 : 5.5)) 
+    ? (isOpalina10 ? 11 : (isOpalina9 ? 8 : (isOpalina20 ? 5.5 : 7))) 
     : 12;
 
   return (
@@ -399,9 +400,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const pendingProducts = products.filter(p => !p.labeled);
   const labeledProducts = products.filter(p => p.labeled === true);
 
-  // Formato de hoja: 'opalina9' (3x3), 'opalina12' (3x4), 'opalina16' (4x4), 'opalina15' (5x3), 'opalina10' (5x2), '24', '30'
-  const [sheetLayout, setSheetLayout] = useState('opalina9');
-  const isOpalina = sheetLayout === 'opalina9' || sheetLayout === 'opalina12' || sheetLayout === 'opalina16' || sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
+  // Formato de hoja: 'opalina16' (4x4), 'opalina20' (4x5), 'opalina12' (3x4), 'opalina9' (3x3), 'opalina15', 'opalina10', '24', '30'
+  const [sheetLayout, setSheetLayout] = useState('opalina16');
+  const isOpalina = sheetLayout.startsWith('opalina');
   const isLandscape = sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
 
   // Pestaña de filtro activa: 'pending' (solo pendientes), 'all' (todo el catálogo), 'labeled' (ya etiquetadas)
@@ -429,7 +430,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
   // Modo principal: 'preprinted' (Lote de Códigos Libres) | 'existing' (Prendas del Inventario)
   const [mainMode, setMainMode] = useState('preprinted');
-  const [blankCount, setBlankCount] = useState(9);
+  const [blankCount, setBlankCount] = useState(16);
   const [nextStartSeq, setNextStartSeq] = useState(1001);
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [actualPrintedSkus, setActualPrintedSkus] = useState(null);
@@ -633,7 +634,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     ? [] 
     : Object.keys(selectedIds).filter(id => selectedIds[id]);
   const totalLabelsToPrint = flatLabels.filter(l => !l.isBlank).length;
-  const labelsPerPage = sheetLayout === 'opalina9' ? 9 : (sheetLayout === 'opalina12' ? 12 : (sheetLayout === 'opalina16' ? 16 : (sheetLayout === 'opalina15' ? 15 : (sheetLayout === 'opalina10' ? 10 : Number(sheetLayout)))));
+  const labelsPerPage = sheetLayout === 'opalina16' ? 16 : (sheetLayout === 'opalina20' ? 20 : (sheetLayout === 'opalina12' ? 12 : (sheetLayout === 'opalina9' ? 9 : (sheetLayout === 'opalina15' ? 15 : (sheetLayout === 'opalina10' ? 10 : Number(sheetLayout))))));
   
   // Dividir en páginas exactas
   const pages = [];
@@ -925,8 +926,10 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                         onChange={(e) => {
                           const val = e.target.value;
                           setSheetLayout(val);
-                          if (val === 'opalina9') setBlankCount(9);
+                          if (val === 'opalina16') setBlankCount(16);
+                          else if (val === 'opalina20') setBlankCount(20);
                           else if (val === 'opalina12') setBlankCount(12);
+                          else if (val === 'opalina9') setBlankCount(9);
                           else if (val === 'opalina16') setBlankCount(16);
                           else if (val === 'opalina15') setBlankCount(15);
                           else if (val === 'opalina10') setBlankCount(10);
@@ -945,9 +948,10 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                           fontWeight: 700
                         }}
                       >
-                        <option value="opalina9">🏷️ Opalina 9 (Carta Vertical 3x3 - Logo Grande, 1 Hoja Exacta)</option>
-                        <option value="opalina12">🏷️ Opalina 12 (Carta Vertical 3x4 - Compacta)</option>
-                        <option value="opalina16">🏷️ Opalina 16 (Carta Vertical 4x4)</option>
+                        <option value="opalina16">🏷️ Opalina 16 (Carta Vertical 4x4 - 16 por hoja) [Recomendada]</option>
+                        <option value="opalina20">🏷️ Opalina 20 (Carta Vertical 4x5 - 20 por hoja - Máximo ahorro)</option>
+                        <option value="opalina12">🏷️ Opalina 12 (Carta Vertical 3x4 - 12 por hoja)</option>
+                        <option value="opalina9">🏷️ Opalina 9 (Carta Vertical 3x3 - 9 por hoja - Grande)</option>
                         <option value="opalina15">🏷️ Opalina 15 (Carta Horizontal 5x3)</option>
                         <option value="opalina10">🏷️ Opalina 10 (Carta Horizontal 5x2)</option>
                         <option value="24">📄 Autoadhesiva 24 (3x8) Ropa</option>
@@ -1509,7 +1513,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0284c7' }}>
-                        {sheetLayout === 'opalina9' ? '🏷️ Hoja Opalina 9 (Carta Vertical 3x3)' : (sheetLayout === 'opalina12' ? '🏷️ Hoja Opalina 12 (Carta Vertical 3x4)' : (sheetLayout === 'opalina16' ? '🏷️ Hoja Opalina 16 (Carta Vertical 4x4)' : (sheetLayout === 'opalina15' ? '🏷️ Hoja Opalina 15 (Carta Horizontal 5x3)' : (sheetLayout === 'opalina10' ? '🏷️ Hoja Opalina 10 (Carta Horizontal 5x2)' : '📄 Hoja Autoadhesiva'))))}
+                        {sheetLayout === 'opalina16' ? '🏷️ Hoja Opalina 16 (Carta Vertical 4x4)' : (sheetLayout === 'opalina20' ? '🏷️ Hoja Opalina 20 (Carta Vertical 4x5)' : (sheetLayout === 'opalina12' ? '🏷️ Hoja Opalina 12 (Carta Vertical 3x4)' : (sheetLayout === 'opalina9' ? '🏷️ Hoja Opalina 9 (Carta Vertical 3x3)' : (sheetLayout === 'opalina15' ? '🏷️ Hoja Opalina 15 (Carta Horizontal 5x3)' : (sheetLayout === 'opalina10' ? '🏷️ Hoja Opalina 10 (Carta Horizontal 5x2)' : '📄 Hoja Autoadhesiva')))))}
                       </span>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                         Página {pIdx + 1} de {totalPages}
@@ -1518,8 +1522,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: (sheetLayout === 'opalina9' || sheetLayout === 'opalina12') ? 'repeat(3, 1fr)' : (sheetLayout === 'opalina16' ? 'repeat(4, 1fr)' : (isLandscape ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)')),
-                      gridTemplateRows: sheetLayout === 'opalina9' ? 'repeat(3, minmax(220px, 245px))' : (sheetLayout === 'opalina12' ? 'repeat(4, minmax(180px, 205px))' : (sheetLayout === 'opalina16' ? 'repeat(4, minmax(180px, 205px))' : (sheetLayout === 'opalina15' ? 'repeat(3, minmax(215px, 240px))' : (sheetLayout === 'opalina10' ? 'repeat(2, minmax(310px, 340px))' : undefined)))),
+                      gridTemplateColumns: (sheetLayout === 'opalina16' || sheetLayout === 'opalina20') ? 'repeat(4, 1fr)' : ((sheetLayout === 'opalina9' || sheetLayout === 'opalina12') ? 'repeat(3, 1fr)' : (isLandscape ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)')),
+                      gridTemplateRows: sheetLayout === 'opalina20' ? 'repeat(5, minmax(170px, 195px))' : (sheetLayout === 'opalina16' ? 'repeat(4, minmax(190px, 215px))' : (sheetLayout === 'opalina12' ? 'repeat(4, minmax(180px, 205px))' : (sheetLayout === 'opalina9' ? 'repeat(3, minmax(220px, 245px))' : (sheetLayout === 'opalina15' ? 'repeat(3, minmax(215px, 240px))' : (sheetLayout === 'opalina10' ? 'repeat(2, minmax(310px, 340px))' : undefined))))),
                       gap: isOpalina ? '2mm 2mm' : (sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm')
                     }}>
                       {pageLabels.map((item, idx) => (
@@ -1553,33 +1557,37 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               className="batch-print-page"
               style={{
                 display: 'grid',
-                gridTemplateColumns: (sheetLayout === 'opalina9' || sheetLayout === 'opalina12')
-                  ? 'repeat(3, 58mm)'
-                  : (sheetLayout === 'opalina16'
-                      ? 'repeat(4, 43mm)'
+                gridTemplateColumns: (sheetLayout === 'opalina16' || sheetLayout === 'opalina20')
+                  ? 'repeat(4, 43.5mm)'
+                  : ((sheetLayout === 'opalina9' || sheetLayout === 'opalina12')
+                      ? 'repeat(3, 58mm)'
                       : (isLandscape ? 'repeat(5, 50.5mm)' : 'repeat(3, 1fr)')),
-                gridTemplateRows: sheetLayout === 'opalina9'
-                  ? 'repeat(3, 68mm)'
-                  : (sheetLayout === 'opalina12'
-                      ? 'repeat(4, 48mm)'
-                      : (sheetLayout === 'opalina16'
-                          ? 'repeat(4, 48mm)'
-                          : (sheetLayout === 'opalina15' ? 'repeat(3, 61mm)' : (sheetLayout === 'opalina10' ? 'repeat(2, 94mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)'))))),
-                gap: (sheetLayout === 'opalina9' || sheetLayout === 'opalina12')
-                  ? '2mm 3mm'
+                gridTemplateRows: sheetLayout === 'opalina20'
+                  ? 'repeat(5, 46.5mm)'
                   : (sheetLayout === 'opalina16'
-                      ? '1.5mm 2mm'
+                      ? 'repeat(4, 57.5mm)'
+                      : (sheetLayout === 'opalina12'
+                          ? 'repeat(4, 51.5mm)'
+                          : (sheetLayout === 'opalina9'
+                              ? 'repeat(3, 68mm)'
+                              : (sheetLayout === 'opalina15' ? 'repeat(3, 61mm)' : (sheetLayout === 'opalina10' ? 'repeat(2, 94mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)')))))),
+                gap: (sheetLayout === 'opalina16' || sheetLayout === 'opalina20')
+                  ? '1.5mm 2mm'
+                  : ((sheetLayout === 'opalina9' || sheetLayout === 'opalina12')
+                      ? '2mm 3mm'
                       : (isLandscape ? '1.5mm 2mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'))),
                 boxSizing: 'border-box',
-                padding: sheetLayout === 'opalina9'
-                  ? '3mm 4mm'
-                  : ((sheetLayout === 'opalina12' || sheetLayout === 'opalina16')
-                      ? '2mm 2mm'
-                      : (isLandscape ? '2mm 3mm' : '5mm 5mm')),
+                padding: (sheetLayout === 'opalina16' || sheetLayout === 'opalina20')
+                  ? '2mm 2.5mm'
+                  : (sheetLayout === 'opalina9'
+                      ? '3mm 4mm'
+                      : ((sheetLayout === 'opalina12')
+                          ? '2mm 2.5mm'
+                          : (isLandscape ? '2mm 3mm' : '5mm 5mm'))),
                 width: '100%',
-                maxWidth: isLandscape ? '265mm' : '190mm',
-                height: isLandscape ? '195mm' : (sheetLayout === 'opalina9' ? '216mm' : '204mm'),
-                maxHeight: isLandscape ? '195mm' : (sheetLayout === 'opalina9' ? '216mm' : '204mm'),
+                maxWidth: isLandscape ? '265mm' : '185mm',
+                height: isLandscape ? '195mm' : (sheetLayout === 'opalina20' ? '242mm' : (sheetLayout === 'opalina16' ? '238mm' : '216mm')),
+                maxHeight: isLandscape ? '195mm' : (sheetLayout === 'opalina20' ? '242mm' : (sheetLayout === 'opalina16' ? '238mm' : '216mm')),
                 margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',
