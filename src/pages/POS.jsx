@@ -1309,6 +1309,7 @@ export default function POS() {
       if (newStatus !== 'entregado') {
         payload.addedToCash = false;
         payload.paymentSubtype = null;
+        payload.shiftId = null;
       }
       await updateDoc(doc(db, "orders", orderId), payload);
       soundAlert('beep');
