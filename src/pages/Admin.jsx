@@ -537,304 +537,98 @@ const Admin = () => {
             </div>
           </div>
           
-          <div className="admin-grid">
-            <div className="admin-card glass">
-              <h2>{editingId ? 'Editar Prenda' : 'Añadir Prenda'}</h2>
-              <form onSubmit={handleAddProduct} className="admin-form">
-                <div className="form-group">
-                  <label>Nombre</label>
-                  <input type="text" value={editingId ? editForm.name : newProduct.name} onChange={(e) => editingId ? setEditForm({...editForm, name: e.target.value}) : setNewProduct({...newProduct, name: e.target.value})} required className="input-field" />
-                </div>
-                
-                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label>Precio ($)</label>
-                    <input type="number" step="0.01" value={editingId ? editForm.price : newProduct.price} onChange={(e) => editingId ? setEditForm({...editForm, price: e.target.value}) : setNewProduct({...newProduct, price: e.target.value})} required className="input-field" />
-                  </div>
-                  <div className="form-group">
-                    <label>Stock</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={editingId ? (isNaN(Number(editForm.stock)) ? '' : editForm.stock) : newProduct.stock} 
-                      onChange={(e) => editingId ? setEditForm({...editForm, stock: e.target.value}) : setNewProduct({...newProduct, stock: e.target.value})} 
-                      required 
-                      className="input-field" 
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <span>Código de Barras / SKU</span>
-                    <span style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                      🎯 Escanear o Auto
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Escanea el código de la etiqueta pegada (o déjalo en blanco para auto)"
-                    value={editingId ? (editForm.code || '') : (newProduct.code || '')}
-                    onChange={(e) => editingId ? setEditForm({...editForm, code: e.target.value}) : setNewProduct({...newProduct, code: e.target.value})}
-                    className="input-field"
-                    style={{ fontFamily: 'monospace', fontWeight: 700 }}
-                  />
-                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.35rem', display: 'block' }}>
-                    Si ya le pegaste un sticker pre-impreso, dale el pistolazo aquí. Si lo dejas vacío, el sistema generará uno automáticamente.
-                  </small>
-                </div>
-
-                {/* TALLA */}
-                <div className="form-group">
-                  <label>Talla</label>
-                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                    {['CH', 'M', 'G', 'XL', 'Uni'].map(t => {
-                      const curSize = editingId ? editForm.size : newProduct.size;
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => editingId ? setEditForm({...editForm, size: t}) : setNewProduct({...newProduct, size: t})}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            borderRadius: '5px',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            border: curSize === t ? '1px solid #38bdf8' : '1px solid #334155',
-                            backgroundColor: curSize === t ? '#38bdf8' : 'var(--color-surface)',
-                            color: curSize === t ? '#0f172a' : '#cbd5e1',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="O escribe otra talla (ej. 32, 7.5)" 
-                    value={editingId ? (editForm.size || '') : (newProduct.size || '')} 
-                    onChange={(e) => editingId ? setEditForm({...editForm, size: e.target.value}) : setNewProduct({...newProduct, size: e.target.value})} 
-                    className="input-field" 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Categoría</label>
-                  <select 
-                    value={editingId ? editForm.category : newProduct.category}
-                    onChange={(e) => editingId ? setEditForm({...editForm, category: e.target.value}) : setNewProduct({...newProduct, category: e.target.value})}
-                    className="input-field"
-                    style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
-                  >
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                </div>
-
-                {/* CANAL DE VENTA */}
-                <div className="form-group" style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 700, color: '#fff' }}>
-                    <input
-                      type="checkbox"
-                      checked={editingId ? (editForm.availableOnline !== false) : Boolean(newProduct.availableOnline)}
-                      onChange={(e) => editingId ? setEditForm({...editForm, availableOnline: e.target.checked}) : setNewProduct({...newProduct, availableOnline: e.target.checked})}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#38bdf8' }}
-                    />
-                    <span>🌐 Publicar en Tienda Web (Catálogo Clientes)</span>
-                  </label>
-                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.35rem', display: 'block', marginLeft: '1.6rem' }}>
-                    Si lo desmarcas, se guardará como 🏬 <strong>Solo Tienda Física</strong> (no se exhibirá en la página web y no requiere foto obligatoria).
-                  </small>
-                </div>
-
-                <div className="form-group">
-                  <label style={{ display: 'block', marginBottom: '0.4rem' }}>
-                    📸 Foto de la Prenda {(editingId ? editForm.availableOnline : newProduct.availableOnline) ? '(Recomendada para la web)' : '(Opcional para tienda física)'}
-                  </label>
-                  
-                  {/* Inputs para Cámara y Galería */}
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => setImageFile(e.target.files[0])} 
-                    style={{ display: 'none' }}
-                    id="admin-form-camera-input"
-                  />
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files[0])} 
-                    style={{ display: 'none' }}
-                    id="admin-form-gallery-input"
-                  />
-
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <label
-                      htmlFor="admin-form-camera-input"
-                      className="btn btn-sm"
-                      style={{ backgroundColor: '#0284c7', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}
-                    >
-                      📸 Tomar Foto
-                    </label>
-                    <label
-                      htmlFor="admin-form-gallery-input"
-                      className="btn btn-sm"
-                      style={{ backgroundColor: '#334155', color: '#fff', cursor: 'pointer', padding: '0.55rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, border: '1px solid #475569' }}
-                    >
-                      🖼️ Galería / Archivo
-                    </label>
-                  </div>
-
-                  {imageFile && (
-                    <div style={{ marginTop: '0.5rem', color: '#34d399', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span>✓ Foto seleccionada: {imageFile.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setImageFile(null)}
-                        style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer', marginLeft: '0.5rem' }}
-                      >
-                        (Quitar)
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label>Descripción o Notas (Opcional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ej. Algodón 100%, corte regular" 
-                    value={editingId ? (editForm.description || '') : (newProduct.description || '')} 
-                    onChange={(e) => editingId ? setEditForm({...editForm, description: e.target.value}) : setNewProduct({...newProduct, description: e.target.value})} 
-                    className="input-field" 
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
-                  <button disabled={loading} type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                    {loading ? 'Procesando...' : (editingId ? 'Guardar Cambios' : 'Publicar')}
-                  </button>
-                  {editingId && (
-                    <button 
-                      type="button" 
-                      onClick={clearForm} 
-                      className="btn" 
-                      style={{ flex: 1, backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
+          {/* SECCIÓN PRINCIPAL: ALTA RÁPIDA DE PRENDAS (ENFOCADA Y LIMPIA) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            marginTop: '1.5rem'
+          }}>
+            <div style={{
+              width: '70px',
+              height: '70px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+              border: '2px solid rgba(56, 189, 248, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem auto',
+              fontSize: '2rem'
+            }}>
+              ⚡
             </div>
 
-            <div className="admin-card glass">
-              <h2>Inventario</h2>
-              <div className="inventory-list">
-                {products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
-                  <div key={p.id} className="inventory-item" style={{ display: 'flex', alignItems: 'center' }}>
-                    {p.image && (
-                      <img 
-                        src={getProductImage(p)} 
-                        alt={p.name} 
-                        style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} 
-                        onError={(e) => { e.target.onerror = null; e.target.src = '/images/brand_logo_1774572391476.png'; }}
-                      />
-                    )}
-                    <div className="inventory-info" style={{ flex: 1, marginLeft: '15px' }}>
-                      <strong>{p.name}</strong> <span style={{ fontSize: '0.75rem', color: '#888', userSelect: 'all' }}>(ID: {p.id})</span>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                        <span>${Number(p.price || 0).toFixed(2)}</span> | <span style={{ color: (isNaN(Number(p.stock)) || Number(p.stock) <= 0) ? '#ef4444' : '#10b981', fontWeight: 600 }}>Stock: {isNaN(Number(p.stock)) ? 0 : p.stock}</span> | <span>SKU: {p.code || p.sku || 'N/A'}</span>
-                        {p.size && (
-                          <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-                            Talla: {p.size}
-                          </span>
-                        )}
-                        <span style={{ color: 'var(--color-secondary)' }}>{p.category}</span>
-                        {p.availableOnline === false ? (
-                          <span style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.35)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
-                            🏬 Solo Tienda
-                          </span>
-                        ) : (
-                          <span style={{ backgroundColor: 'rgba(52, 211, 153, 0.15)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.35)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
-                            🌐 En Web
-                          </span>
-                        )}
-                      </div>
-                      {(p.createdByName || p.createdBy) && (
-                        <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '3px' }}>
-                          👤 Alta por: <strong>{p.createdByName || p.createdBy?.split('@')[0]}</strong>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {p.availableOnline === false && (
-                        <button
-                          type="button"
-                          onClick={() => setPromotingProduct(p)}
-                          className="btn btn-sm"
-                          title="Tomar foto y publicar en la tienda web"
-                          style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)' }}
-                        >
-                          📸 Publicar Web
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button 
-                          type="button" 
-                          onClick={() => setSelectedBarcodeProduct(p)} 
-                          className="btn btn-sm" 
-                          title="Imprimir código de barras (Solo Administrador)"
-                          style={{ backgroundColor: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}
-                        >
-                          🏷️ Barcode
-                        </button>
-                      )}
-                      <button onClick={() => handleEdit(p)} className="btn btn-sm">Edit</button>
-                      {isAdmin && (
-                        <button 
-                          onClick={() => handleDelete(p.id)} 
-                          className="btn btn-danger btn-sm"
-                          title="Eliminar prenda (Solo Administrador)"
-                        >
-                          X
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            <h2 style={{ color: '#f8fafc', fontSize: '1.6rem', fontWeight: 800, margin: '0 0 0.5rem 0' }}>
+              Módulo de Alta Rápida de Prendas
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.95rem', maxWidth: '580px', margin: '0 auto 1.75rem auto', lineHeight: 1.5 }}>
+              Registra prendas de forma ágil desde tu celular o computadora: toma la foto con la cámara, escanea la etiqueta física pegada, asigna precio y talla en segundos.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowQuickEntryModal(true)}
+              style={{
+                background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                color: '#0f172a',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '1rem 2.25rem',
+                fontSize: '1.15rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                boxShadow: '0 8px 25px rgba(56, 189, 248, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              ⚡ Iniciar Alta Rápida de Prenda Ahora
+            </button>
+
+            {/* Pasos explicativos para empleados y administradores */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1rem',
+              maxWidth: '850px',
+              margin: '2.5rem auto 0 auto',
+              textAlign: 'left'
+            }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid #334155', borderRadius: '10px', padding: '1.1rem' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>📸</div>
+                <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>1. Foto de la Prenda</strong>
+                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0.35rem 0 0 0', lineHeight: 1.45 }}>
+                  Toma la foto directamente con la cámara del celular o sube una imagen de tu galería.
+                </p>
               </div>
-              {/* Controles de paginación */}
-              {products.length > itemsPerPage && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '1.5rem', alignItems: 'center' }}>
-                  <button 
-                    disabled={currentPage === 1} 
-                    onClick={() => setCurrentPage(prev => prev - 1)}
-                    className="btn btn-sm"
-                  >
-                    Anterior
-                  </button>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--color-text-light)' }}>
-                    Página {currentPage} de {Math.ceil(products.length / itemsPerPage)}
-                  </span>
-                  <button 
-                    disabled={currentPage === Math.ceil(products.length / itemsPerPage)} 
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="btn btn-sm"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              )}
+
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid #334155', borderRadius: '10px', padding: '1.1rem' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>🏷️</div>
+                <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>2. Escanear Etiqueta</strong>
+                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0.35rem 0 0 0', lineHeight: 1.45 }}>
+                  Apunta con la cámara o pistola al código de barras que ya tiene pegado la prenda.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid #334155', borderRadius: '10px', padding: '1.1rem' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>🏷️</div>
+                <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>3. Talla, Precio y Guardar</strong>
+                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0.35rem 0 0 0', lineHeight: 1.45 }}>
+                  Elige la talla y precio de venta. Queda guardada al instante en mostrador y web.
+                </p>
+              </div>
             </div>
           </div>
-
         </div>
       </div>
 
-      {selectedBarcodeProduct && (
+{selectedBarcodeProduct && (
         <BarcodeModal 
           product={selectedBarcodeProduct} 
           onClose={() => setSelectedBarcodeProduct(null)} 

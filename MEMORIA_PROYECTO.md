@@ -286,6 +286,12 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * Para los empleados en celular, el único botón operativo destacado es **`⚡ Alta Rápida (Pistola / Celular)`** para escanear etiquetas pegadas y tomar fotos.
   * En las tarjetas de catálogo del mostrador (`POS.jsx`), el botón de imprimir código de barras también quedó condicionado a Administrador.
 
+### Y. Simplificación del Panel de Registro (Eliminación de Formulario Viejo e Inventario)
+* **Limpieza Total de `/admin`:**
+  * Se removieron definitivamente el formulario manual antiguo de "Añadir Prenda" y la lista duplicada de "Inventario".
+  * La pantalla queda 100% enfocada y limpia: muestra la tarjeta principal del **Módulo de Alta Rápida de Prendas** con su botón directo `⚡ Iniciar Alta Rápida de Prenda Ahora` y los 3 pasos visuales para registro ágil con cámara y pistola.
+  * Todo el control contable y stock de inventario se mantiene unificado en el Punto de Venta.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
