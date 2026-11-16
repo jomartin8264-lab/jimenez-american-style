@@ -43,7 +43,7 @@ function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   );
 }
 
-function OpalinaHangtagItem({ item, isPrint = false }) {
+function OpalinaHangtagItem({ item, sheetLayout = 'opalina15', isPrint = false }) {
   if (item.isBlank) {
     return (
       <div 
@@ -52,6 +52,7 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
           border: isPrint ? 'none' : '1px dashed #cbd5e1', 
           visibility: isPrint ? 'hidden' : 'visible',
           height: '100%',
+          minHeight: isPrint ? (sheetLayout === 'opalina10' ? '98mm' : '64mm') : (sheetLayout === 'opalina10' ? '300px' : '210px'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -64,6 +65,7 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
     );
   }
 
+  const isOpalina10 = sheetLayout === 'opalina10';
   const itemSize = (item.size || '').toUpperCase().trim();
 
   return (
@@ -71,14 +73,14 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
       key={item.key}
       style={{
         position: 'relative',
-        border: '0.5px dashed #94a3b8',
+        border: isPrint ? '0.5px dashed #94a3b8' : '1px dashed #94a3b8',
         borderRadius: '3px',
         backgroundColor: '#ffffff',
         color: '#0f172a',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '3mm 2.2mm 2.2mm 2.2mm',
+        padding: isPrint ? '2mm 2.2mm 2mm 2.2mm' : '7px 7px 5px 7px',
         boxSizing: 'border-box',
         height: '100%',
         maxHeight: '100%',
@@ -87,25 +89,26 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
         breakInside: 'avoid'
       }}
     >
-      {/* 1. GUÍA DE PERFORACIÓN (Círculo para perforadora manual de papel) */}
+      {/* 1. GUÍA DE PERFORACIÓN (Círculo para perforadora manual de papel / plastiflecha) */}
       <div style={{
         position: 'absolute',
-        top: '2.5mm',
+        top: isPrint ? '2mm' : '4px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '4.5mm',
-        height: '4.5mm',
+        width: isPrint ? '3.5mm' : '12px',
+        height: isPrint ? '3.5mm' : '12px',
         borderRadius: '50%',
         border: '0.6px dashed #64748b',
         backgroundColor: '#f8fafc',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '4.5px',
+        fontSize: isPrint ? '4px' : '8px',
         color: '#94a3b8',
-        lineHeight: 1
+        lineHeight: 1,
+        zIndex: 2
       }}>
-        +
+        ○
       </div>
 
       {/* Esquinas biseladas guía de corte (45°) */}
@@ -113,8 +116,8 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
         position: 'absolute',
         top: 0,
         left: 0,
-        width: '4.5mm',
-        height: '4.5mm',
+        width: isPrint ? '4mm' : '10px',
+        height: isPrint ? '4mm' : '10px',
         borderRight: '0.5px dashed #cbd5e1',
         borderBottom: '0.5px dashed #cbd5e1',
         pointerEvents: 'none'
@@ -123,67 +126,60 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
         position: 'absolute',
         top: 0,
         right: 0,
-        width: '4.5mm',
-        height: '4.5mm',
+        width: isPrint ? '4mm' : '10px',
+        height: isPrint ? '4mm' : '10px',
         borderLeft: '0.5px dashed #cbd5e1',
         borderBottom: '0.5px dashed #cbd5e1',
         pointerEvents: 'none'
       }} />
 
-      {/* 2. CABECERA: LOGO + MARCA DE LA TIENDA */}
-      <div style={{ textAlign: 'center', marginTop: '4mm' }}>
+      {/* 2. CABECERA: LOGO MUY GRANDE Y DESTACADO */}
+      <div style={{ textAlign: 'center', marginTop: isPrint ? '2.5mm' : '6px' }}>
         <img 
           src="/images/brand_logo_1774572391476.png" 
-          alt="Logo"
+          alt="Jiménez American Style"
           style={{
-            width: '20px',
-            height: '20px',
+            width: isPrint ? (isOpalina10 ? '28mm' : '22mm') : (isOpalina10 ? '82px' : '64px'),
+            height: isPrint ? (isOpalina10 ? '28mm' : '22mm') : (isOpalina10 ? '82px' : '64px'),
             borderRadius: '50%',
-            objectFit: 'cover',
+            objectFit: 'contain',
             display: 'block',
-            margin: '0 auto 1px auto'
+            margin: '0 auto',
+            border: '1.2px solid #b45309',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
           }}
           onError={(e) => { e.target.style.display = 'none'; }}
         />
         <div style={{ 
           fontFamily: "'Outfit', 'Georgia', serif", 
-          fontSize: '10px', 
+          fontSize: isPrint ? (isOpalina10 ? '9.5px' : '7.5px') : (isOpalina10 ? '12px' : '10px'), 
           fontWeight: 900, 
-          letterSpacing: '0.5px', 
+          letterSpacing: '0.3px', 
           color: '#0f172a',
-          lineHeight: 1.1
+          lineHeight: 1.1,
+          marginTop: '1.5px'
         }}>
           Jiménez
         </div>
         <div style={{ 
-          fontSize: '5.5px', 
+          fontSize: isPrint ? (isOpalina10 ? '5.2px' : '4.5px') : (isOpalina10 ? '7.5px' : '6px'), 
           fontWeight: 800, 
           color: '#b45309', 
-          letterSpacing: '1.5px', 
+          letterSpacing: '1px', 
           textTransform: 'uppercase',
           lineHeight: 1
         }}>
           AMERICAN STYLE
         </div>
-        <div style={{ 
-          fontSize: '4.5px', 
-          color: '#64748b', 
-          letterSpacing: '0.5px', 
-          textTransform: 'uppercase',
-          marginTop: '1px',
-          lineHeight: 1
-        }}>
-          Moda Americana
-        </div>
       </div>
 
       {/* LÍNEA DIVISORIA */}
-      <div style={{ borderTop: '0.5px solid #e2e8f0', margin: '2px 0' }} />
+      <div style={{ borderTop: '0.5px solid #e2e8f0', margin: isPrint ? '1.5px 0' : '2px 0' }} />
 
       {/* 3. DETALLE DE PRENDA, TALLAS Y PRECIO */}
-      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: isPrint ? '1px' : '2px' }}>
         <div style={{
-          fontSize: '7.5px',
+          fontSize: isPrint ? (isOpalina10 ? '7.5px' : '6.5px') : (isOpalina10 ? '10px' : '8.5px'),
           fontWeight: 700,
           color: '#1e293b',
           whiteSpace: 'nowrap',
@@ -195,11 +191,8 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
           {item.name || 'Moda Americana'}
         </div>
 
-        {/* CASILLAS DE TALLA (IDÉNTICO A LA FOTO DE REFERENCIA) */}
-        <div style={{ marginTop: '1px' }}>
-          <div style={{ fontSize: '5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>
-            TALLA / SIZE
-          </div>
+        {/* CASILLAS DE TALLA */}
+        <div style={{ marginTop: '0.5px' }}>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(5, 1fr)',
@@ -224,8 +217,8 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
                     backgroundColor: isMatch ? '#0f172a' : '#ffffff',
                     color: isMatch ? '#ffffff' : '#0f172a',
                     fontWeight: 800,
-                    fontSize: '6px',
-                    padding: '1.5px 0',
+                    fontSize: isPrint ? (isOpalina10 ? '5.5px' : '4.8px') : (isOpalina10 ? '8px' : '7px'),
+                    padding: isPrint ? '0.8px 0' : '1.5px 0',
                     textAlign: 'center',
                     lineHeight: 1,
                     display: 'flex',
@@ -236,7 +229,7 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
                 >
                   {sz}
                   {isMatch && (
-                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7.5px', color: '#38bdf8' }}>✓</span>
+                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isPrint ? '6.5px' : '9px', color: '#38bdf8' }}>✓</span>
                   )}
                 </div>
               );
@@ -246,20 +239,20 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
 
         {/* CUADRO DE PRECIO */}
         <div style={{ 
-          marginTop: '2px', 
-          padding: '2.5px 4px', 
+          marginTop: '1px', 
+          padding: isPrint ? '1px 3px' : '2px 4px', 
           backgroundColor: '#f8fafc', 
           borderRadius: '3px',
-          border: '0.5px solid #e2e8f0'
+          border: '0.5px solid #cbd5e1'
         }}>
           {item.isPreprinted || item.price == null ? (
-            <div style={{ fontSize: '7.5px', fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', lineHeight: 1 }}>
+            <div style={{ fontSize: isPrint ? (isOpalina10 ? '7.5px' : '6.5px') : (isOpalina10 ? '10px' : '8.5px'), fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', lineHeight: 1 }}>
               PRECIO: $ ________
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', lineHeight: 1 }}>
-              <span style={{ fontSize: '6px', color: '#64748b', fontWeight: 700 }}>PRECIO:</span>
-              <span style={{ fontSize: '11px', fontWeight: 900, color: '#0f172a' }}>
+              <span style={{ fontSize: isPrint ? '5px' : '7px', color: '#64748b', fontWeight: 700 }}>PRECIO:</span>
+              <span style={{ fontSize: isPrint ? (isOpalina10 ? '10.5px' : '9px') : (isOpalina10 ? '13px' : '11px'), fontWeight: 900, color: '#0f172a' }}>
                 ${Number(item.price).toFixed(2)}
               </span>
             </div>
@@ -270,17 +263,17 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
       {/* 4. BLOQUE INFERIOR: CÓDIGO DE BARRAS + SKU + REDES */}
       <div style={{ 
         marginTop: 'auto',
-        paddingTop: '2px',
+        paddingTop: isPrint ? '1.5px' : '3px',
         borderTop: '0.6px solid #e2e8f0',
         textAlign: 'center'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '1px 0' }}>
-          <BarcodeSVG code={item.code} height={14} width={1.05} />
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '0.5px 0' }}>
+          <BarcodeSVG code={item.code} height={isPrint ? (isOpalina10 ? 11 : 9) : (isOpalina10 ? 15 : 12)} width={isPrint ? 1.05 : 1.05} />
         </div>
 
         <div style={{ 
           fontFamily: 'monospace', 
-          fontSize: '7.5px', 
+          fontSize: isPrint ? (isOpalina10 ? '6.8px' : '6px') : (isOpalina10 ? '9px' : '7.5px'), 
           fontWeight: 800, 
           letterSpacing: '0.8px',
           color: '#0f172a',
@@ -290,13 +283,13 @@ function OpalinaHangtagItem({ item, isPrint = false }) {
         </div>
 
         <div style={{ 
-          fontSize: '4.5px', 
+          fontSize: isPrint ? (isOpalina10 ? '4.2px' : '3.6px') : (isOpalina10 ? '6.5px' : '5.5px'), 
           color: '#64748b', 
-          marginTop: '2px',
-          letterSpacing: '0.3px',
+          marginTop: '1px',
+          letterSpacing: '0.2px',
           lineHeight: 1
         }}>
-          @jimenezamericanstyle • Tienda Alina
+          @jimenezamericanstyle
         </div>
       </div>
     </div>
@@ -396,7 +389,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const labeledProducts = products.filter(p => p.labeled === true);
 
   // Formato de hoja: 'opalina10' (10 etiquetas colgantes 5x2), '24' (3x8) o '30' (3x10)
-  const [sheetLayout, setSheetLayout] = useState('opalina10');
+  const [sheetLayout, setSheetLayout] = useState('opalina15');
 
   // Pestaña de filtro activa: 'pending' (solo pendientes), 'all' (todo el catálogo), 'labeled' (ya etiquetadas)
   const [filterTab, setFilterTab] = useState(() => pendingProducts.length > 0 ? 'pending' : 'all');
@@ -423,7 +416,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
   // Modo principal: 'preprinted' (Lote de Códigos Libres) | 'existing' (Prendas del Inventario)
   const [mainMode, setMainMode] = useState('preprinted');
-  const [blankCount, setBlankCount] = useState(10);
+  const [blankCount, setBlankCount] = useState(15);
   const [nextStartSeq, setNextStartSeq] = useState(1001);
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [actualPrintedSkus, setActualPrintedSkus] = useState(null);
@@ -442,7 +435,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   // Conectar clase especial al body para aislar la hoja en la impresion
   useEffect(() => {
     document.body.classList.add('batch-printing-active');
-    if (sheetLayout === 'opalina10') {
+    if (sheetLayout === 'opalina15' || sheetLayout === 'opalina10') {
       document.body.classList.add('batch-printing-opalina');
     } else {
       document.body.classList.remove('batch-printing-opalina');
@@ -604,7 +597,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     ? [] 
     : Object.keys(selectedIds).filter(id => selectedIds[id]);
   const totalLabelsToPrint = flatLabels.filter(l => !l.isBlank).length;
-  const labelsPerPage = sheetLayout === 'opalina10' ? 10 : Number(sheetLayout);
+  const isOpalina = sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
+  const labelsPerPage = isOpalina ? (sheetLayout === 'opalina15' ? 15 : 10) : Number(sheetLayout);
   
   // Dividir en páginas exactas
   const pages = [];
@@ -840,8 +834,10 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                      {(sheetLayout === 'opalina10' ? [10, 20, 30, 50, 100] : (sheetLayout === '24' ? [24, 48, 72, 96, 120] : [30, 60, 90, 120, 150])).map(cnt => {
-                        const sheets = sheetLayout === 'opalina10' ? cnt / 10 : (sheetLayout === '24' ? cnt / 24 : cnt / 30);
+                      {(sheetLayout === 'opalina15' 
+                        ? [15, 30, 45, 60, 90, 150] 
+                        : (sheetLayout === 'opalina10' ? [10, 20, 30, 50, 100] : (sheetLayout === '24' ? [24, 48, 72, 96, 120] : [30, 60, 90, 120, 150]))).map(cnt => {
+                        const sheets = sheetLayout === 'opalina15' ? cnt / 15 : (sheetLayout === 'opalina10' ? cnt / 10 : (sheetLayout === '24' ? cnt / 24 : cnt / 30));
                         const labelText = Number.isInteger(sheets) ? `${cnt} (${sheets} ${sheets === 1 ? 'hoja' : 'hojas'})` : `${cnt} pzas`;
                         return (
                           <button
@@ -894,7 +890,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                         onChange={(e) => {
                           const val = e.target.value;
                           setSheetLayout(val);
-                          if (val === 'opalina10') setBlankCount(10);
+                          if (val === 'opalina15') setBlankCount(15);
+                          else if (val === 'opalina10') setBlankCount(10);
                           else if (val === '24') setBlankCount(24);
                           else if (val === '30') setBlankCount(30);
                           setStartPosition(1);
@@ -910,7 +907,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                           fontWeight: 700
                         }}
                       >
-                        <option value="opalina10">🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)</option>
+                        <option value="opalina15">🏷️ Opalina 15 (Boutique Compacta 5x3 - 6.5x5.2cm)</option>
+                        <option value="opalina10">🏷️ Opalina 10 (Boutique Larga 5x2 - 10x5.2cm)</option>
                         <option value="24">📄 Autoadhesiva 24 (3x8) Ropa</option>
                         <option value="30">📄 Autoadhesiva 30 (3x10) Compacto</option>
                       </select>
@@ -1048,7 +1046,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                       fontWeight: 700
                     }}
                   >
-                    <option value="opalina10">🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)</option>
+                    <option value="opalina15">🏷️ Opalina 15 (Boutique Compacta 5x3 - 6.5x5.2cm)</option>
+                    <option value="opalina10">🏷️ Opalina 10 (Boutique Larga 5x2 - 10x5.2cm)</option>
                     <option value="24">📄 Autoadhesiva 24 (3x8) Ropa</option>
                     <option value="30">📄 Autoadhesiva 30 (3x10) Compacto</option>
                   </select>
@@ -1457,10 +1456,10 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     key={`preview_page_${pIdx}`}
                     style={{
                       width: '100%',
-                      maxWidth: sheetLayout === 'opalina10' ? '820px' : '700px',
+                      maxWidth: isOpalina ? '840px' : '700px',
                       backgroundColor: '#ffffff',
                       color: '#000000',
-                      padding: sheetLayout === 'opalina10' ? '6mm 6mm' : '8mm 6mm',
+                      padding: isOpalina ? '5mm 5mm' : '8mm 6mm',
                       borderRadius: '4px',
                       boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
                       boxSizing: 'border-box'
@@ -1468,7 +1467,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0284c7' }}>
-                        {sheetLayout === 'opalina10' ? '🏷️ Hoja Opalina (10 Etiquetas Colgantes Boutique)' : '📄 Hoja Autoadhesiva'}
+                        {sheetLayout === 'opalina15' ? '🏷️ Hoja Opalina 15 (Boutique Compacta 5x3)' : (sheetLayout === 'opalina10' ? '🏷️ Hoja Opalina 10 (Boutique Larga 5x2)' : '📄 Hoja Autoadhesiva')}
                       </span>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                         Página {pIdx + 1} de {totalPages}
@@ -1477,13 +1476,13 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: sheetLayout === 'opalina10' ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)',
-                      gridTemplateRows: sheetLayout === 'opalina10' ? 'repeat(2, 98mm)' : undefined,
-                      gap: sheetLayout === 'opalina10' ? '2mm 2.5mm' : (sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm')
+                      gridTemplateColumns: isOpalina ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)',
+                      gridTemplateRows: sheetLayout === 'opalina15' ? 'repeat(3, minmax(215px, 240px))' : (sheetLayout === 'opalina10' ? 'repeat(2, minmax(310px, 340px))' : undefined),
+                      gap: isOpalina ? '2mm 2mm' : (sheetLayout === '24' ? '2mm 3mm' : '1.5mm 2.5mm')
                     }}>
                       {pageLabels.map((item, idx) => (
-                        sheetLayout === 'opalina10'
-                          ? <OpalinaHangtagItem key={item.key || idx} item={item} isPrint={false} />
+                        isOpalina
+                          ? <OpalinaHangtagItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={false} />
                           : <StickerLabelItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={false} />
                       ))}
                     </div>
@@ -1501,7 +1500,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
           <style>{`
             @media print {
               @page {
-                size: ${sheetLayout === 'opalina10' ? 'letter landscape' : 'letter portrait'};
+                size: ${isOpalina ? 'letter landscape' : 'letter portrait'};
                 margin: 0mm;
               }
             }
@@ -1512,15 +1511,15 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               className="batch-print-page"
               style={{
                 display: 'grid',
-                gridTemplateColumns: sheetLayout === 'opalina10' ? 'repeat(5, 51.5mm)' : 'repeat(3, 1fr)',
-                gridTemplateRows: sheetLayout === 'opalina10' ? 'repeat(2, 98.5mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)'),
-                gap: sheetLayout === 'opalina10' ? '2mm 2.5mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'),
+                gridTemplateColumns: isOpalina ? 'repeat(5, 51.5mm)' : 'repeat(3, 1fr)',
+                gridTemplateRows: sheetLayout === 'opalina15' ? 'repeat(3, 64.5mm)' : (sheetLayout === 'opalina10' ? 'repeat(2, 98.5mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)')),
+                gap: isOpalina ? '2mm 2.5mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'),
                 boxSizing: 'border-box',
-                padding: sheetLayout === 'opalina10' ? '4mm 5mm' : '5mm 5mm',
+                padding: isOpalina ? '3mm 4mm' : '5mm 5mm',
                 width: '100%',
-                maxWidth: sheetLayout === 'opalina10' ? '270mm' : '215mm',
-                height: sheetLayout === 'opalina10' ? '204mm' : '272mm',
-                maxHeight: sheetLayout === 'opalina10' ? '204mm' : '272mm',
+                maxWidth: isOpalina ? '272mm' : '215mm',
+                height: isOpalina ? '206mm' : '272mm',
+                maxHeight: isOpalina ? '206mm' : '272mm',
                 margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',
@@ -1532,8 +1531,8 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               }}
             >
               {pageLabels.map((item, idx) => (
-                sheetLayout === 'opalina10'
-                  ? <OpalinaHangtagItem key={item.key || idx} item={item} isPrint={true} />
+                isOpalina
+                  ? <OpalinaHangtagItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={true} />
                   : <StickerLabelItem key={item.key || idx} item={item} sheetLayout={sheetLayout} isPrint={true} />
               ))}
             </div>
