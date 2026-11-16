@@ -12,7 +12,7 @@ import {
   CreditCard, RefreshCw, Barcode, Volume2, VolumeX, 
   ArrowLeft, Store, AlertCircle, Calendar, Users, ShieldCheck, UserPlus, Trash,
   Edit, Settings, FileText, X, Package, Eye, ExternalLink, Filter,
-  Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, AlertTriangle
+  Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, AlertTriangle, LogOut
 } from 'lucide-react';
 import { soundAlert } from '../utils/soundAlert';
 import { getProductImage } from '../utils/productImages';
@@ -28,7 +28,7 @@ export default function POS() {
     description: 'Sistema de punto de venta e inventario para mostrador y pedidos web en vivo.'
   });
 
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
   // Permisos y estados base
@@ -36,6 +36,7 @@ export default function POS() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('pos'); // 'pos', 'orders', 'report'
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
 
   // Inventario y categorías
   const [products, setProducts] = useState([]);
@@ -926,6 +927,27 @@ export default function POS() {
     }
   };
 
+  // Manejo de Cierre de Sesión y Cambio de Usuario con Protección de Turno
+  const handleUserLogout = async () => {
+    // Si hay un turno activo a nombre del usuario actual, advertirle antes de salir
+    if (activeShift && activeShift.openedByEmail?.toLowerCase() === currentUser?.email?.toLowerCase()) {
+      setShowLogoutConfirmModal(true);
+      return;
+    }
+    await executeLogout();
+  };
+
+  const executeLogout = async () => {
+    try {
+      setShowLogoutConfirmModal(false);
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+      alert("No se pudo cerrar la sesión: " + (err.message || err));
+    }
+  };
+
   // Guardar configuración del encabezado y pie del ticket
   const handleSaveTicketConfig = async (e) => {
     e.preventDefault();
@@ -1136,6 +1158,14 @@ export default function POS() {
   const currentShiftTotalOut = currentShiftMovements.filter(m => m.type === 'out').reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
   const currentShiftExpectedCash = activeShift ? ((Number(activeShift.initialCash) || 0) + currentShiftCashSales + currentShiftTotalIn - currentShiftTotalOut) : 0;
   const currentShiftPiecesCount = currentShiftSales.reduce((acc, s) => acc + (s.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 1), 0), 0);
+
+  // Detección de Turno Ajeno Abierto (el usuario anterior no hizo corte)
+  const isForeignShiftOpen = Boolean(
+    activeShift &&
+    currentUser &&
+    activeShift.openedByEmail &&
+    activeShift.openedByEmail.toLowerCase() !== currentUser.email?.toLowerCase()
+  );
 
   // Periodos de Fecha para Reportes: Hoy, Semana, Quincena, Mes, Año, Todo
   const now = new Date();
@@ -1380,8 +1410,106 @@ export default function POS() {
           >
             Ver Tienda Web
           </Link>
+          <button
+            type="button"
+            onClick={handleUserLogout}
+            title="Cerrar sesión actual o cambiar de usuario"
+            style={{
+              color: '#f87171',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              fontSize: '0.85rem',
+              padding: '0.5rem 0.85rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <LogOut size={15} /> Cambiar Usuario
+          </button>
         </div>
       </header>
+
+      {/* ALERTA CRÍTICA: TURNO ANTERIOR PENDIENTE DE CORTE (USUARIO DISTINTO) */}
+      {isForeignShiftOpen && (
+        <div style={{
+          backgroundColor: '#450a0a',
+          borderBottom: '2px solid #ef4444',
+          padding: '0.85rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          fontSize: '0.88rem',
+          color: '#f8fafc',
+          boxShadow: '0 4px 15px rgba(239, 68, 68, 0.35)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flex: 1, minWidth: '300px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <AlertTriangle size={22} color="#f87171" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, color: '#fca5a5', fontSize: '1rem' }}>
+                ⚠️ AVISO: El usuario anterior ({activeShift.cashierName} • {activeShift.openedByEmail}) no realizó corte de caja
+              </div>
+              <div style={{ color: '#e2e8f0', fontSize: '0.82rem', marginTop: '3px' }}>
+                Dejó la caja abierta con un fondo de <strong>${Number(activeShift.initialCash || 0).toFixed(2)}</strong> y <strong>${currentShiftCashSales.toFixed(2)}</strong> en ventas de efectivo. Para evitar revolver el dinero con tu usuario actual (<strong>{currentUser?.email}</strong>), realiza el corte de entrega del turno anterior.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setCloseShiftCountedCash('');
+                setCloseShiftNotes(`Turno auditado y cerrado por ${currentUser?.displayName || currentUser?.email}`);
+                setShowCloseShiftModal(true);
+              }}
+              style={{
+                backgroundColor: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.6rem 1.2rem',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)'
+              }}
+            >
+              🏁 Realizar Corte del Turno de {activeShift.cashierName}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('report')}
+              style={{
+                backgroundColor: '#1e293b',
+                color: '#cbd5e1',
+                border: '1px solid #475569',
+                borderRadius: '6px',
+                padding: '0.6rem 0.9rem',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer'
+              }}
+            >
+              Ver Movimientos
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* BARRA INFORMATIVA DE TURNO Y CAJA */}
       {!activeShift ? (
@@ -4773,28 +4901,134 @@ export default function POS() {
             </div>
 
             {/* BOTONES DE ACCIÓN */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setLastClosedShiftReceipt(null)}
+                  style={{
+                    flex: 1, padding: '0.65rem', backgroundColor: '#e2e8f0',
+                    color: '#0f172a', border: 'none', borderRadius: '6px',
+                    fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    flex: 1, padding: '0.65rem', backgroundColor: '#10b981',
+                    color: '#0f172a', border: 'none', borderRadius: '6px',
+                    fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
+                  }}
+                >
+                  <Printer size={16} /> Imprimir Ticket de Corte
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setLastClosedShiftReceipt(null)}
+                onClick={async () => {
+                  setLastClosedShiftReceipt(null);
+                  await executeLogout();
+                }}
                 style={{
-                  flex: 1, padding: '0.65rem', backgroundColor: '#e2e8f0',
-                  color: '#0f172a', border: 'none', borderRadius: '6px',
-                  fontWeight: 700, cursor: 'pointer'
+                  width: '100%',
+                  padding: '0.65rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem'
                 }}
               >
-                Cerrar
+                <LogOut size={15} /> Salir y Cambiar de Usuario Ahora
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL: CONFIRMACIÓN DE CAMBIO DE USUARIO CON TURNO ABIERTO */}
+      {showLogoutConfirmModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999, padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid #334155',
+            maxWidth: '460px', width: '100%', padding: '1.75rem', color: '#fff',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#fbbf24', marginBottom: '1rem' }}>
+              <AlertTriangle size={24} />
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#f8fafc' }}>
+                ¿Cerrar sesión y cambiar de usuario?
+              </h3>
+            </div>
+
+            <div style={{
+              backgroundColor: 'rgba(251, 191, 36, 0.1)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              borderRadius: '8px',
+              padding: '0.85rem',
+              fontSize: '0.85rem',
+              color: '#cbd5e1',
+              marginBottom: '1.25rem',
+              lineHeight: 1.45
+            }}>
+              Tienes un <strong>turno de caja abierto</strong> a tu nombre con un total esperado de <strong style={{ color: '#38bdf8' }}>${currentShiftExpectedCash.toFixed(2)} MXN</strong> en efectivo.
+              <br /><br />
+              Se recomienda hacer el <strong>Corte de Turno</strong> para que la persona que entre a suplirte (o el dueño) inicie con cuentas claras y sin revolver el dinero.
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => {
+                  setShowLogoutConfirmModal(false);
+                  setCloseShiftCountedCash('');
+                  setCloseShiftNotes('');
+                  setShowCloseShiftModal(true);
+                }}
                 style={{
-                  flex: 1, padding: '0.65rem', backgroundColor: '#10b981',
-                  color: '#0f172a', border: 'none', borderRadius: '6px',
-                  fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
+                  backgroundColor: '#38bdf8', color: '#0f172a',
+                  border: 'none', borderRadius: '8px', padding: '0.75rem',
+                  fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
                 }}
               >
-                <Printer size={16} /> Imprimir Ticket de Corte
+                🏁 Hacer Corte de Caja Primero (Recomendado)
+              </button>
+
+              <button
+                type="button"
+                onClick={executeLogout}
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '0.65rem',
+                  fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+                }}
+              >
+                🚪 Salir y Cambiar de Usuario Sin Corte
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirmModal(false)}
+                className="pos-btn-secondary"
+                style={{ padding: '0.65rem', marginTop: '0.25rem' }}
+              >
+                Cancelar (Quedarme aquí)
               </button>
             </div>
           </div>

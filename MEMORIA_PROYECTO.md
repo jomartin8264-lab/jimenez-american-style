@@ -212,6 +212,14 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
 * **Subpestañas de Reporte:** Desglose en 3 vistas: `📋 Ventas del Periodo`, `💸 Feria y Gastos (Movimientos)`, y `📑 Historial de Turnos y Cortes`.
 * **Eficiencia en Plan Spark (Firebase):** Todos los cálculos, sumas y filtros se realizan en la memoria del navegador. Consumo adicional de lecturas: **0**. Totalmente gratis y ligero.
 
+### Q. Control Multi-Usuario, Cambio de Guardia y Detección de Turno Olvidado
+* **Botón `[ 👤 Cambiar Usuario ]`:** Ubicado en la cabecera superior del POS para que cualquier trabajador, el dueño o la esposa cierren sesión y permitan el acceso inmediato al siguiente usuario.
+* **Detección Automática de Turno Ajeno Abierto:** Si un trabajador olvida hacer el corte y otro usuario (dueño, esposa u otro compañero) inicia sesión, el sistema muestra una barra de alerta roja prioritaria:
+  - Notifica quién abrió el turno, a qué hora, con cuánto fondo y cuánto dinero en ventas dejó.
+  - Permite al nuevo usuario hacer el corte de entrega del turno anterior antes de vender, auditando y cuadrando el dinero para deslindar responsabilidades.
+* **Protección Preventiva al Salir:** Si el cajero actual pulsa salir o cambiar de usuario teniendo un turno abierto con dinero en caja, el sistema le advierte que tiene un turno activo y le sugiere hacer el corte antes de marcharse.
+* **Transición en 1 Clic:** Desde la misma ventana del Ticket de Corte impreso, el cajero saliente tiene el botón **`[ 🚪 Salir y Cambiar de Usuario Ahora ]`**, dejando la pantalla limpia en el login para quien lo supla.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
