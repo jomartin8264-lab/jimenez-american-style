@@ -264,8 +264,8 @@ h1, h2, h3, h4, h5, h6 {
     break-inside: avoid !important;
   }
 
-  /* Formato Opalina Horizontal (15 o 10 etiquetas colgantes en 1 sola hoja) */
-  body.batch-printing-active.batch-printing-opalina .batch-print-page {
+  /* Formato Horizontal (15 o 10 etiquetas colgantes en 1 sola hoja) */
+  body.batch-printing-active.batch-printing-landscape .batch-print-page {
     width: 265mm !important;
     max-width: 265mm !important;
     height: 195mm !important;
