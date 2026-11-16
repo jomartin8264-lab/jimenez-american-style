@@ -117,11 +117,12 @@ const Admin = () => {
         }
         setStaffUsers(sList);
 
-        // 3. Determinar rol
-        const foundUser = sList.find(u => u.email?.toLowerCase() === currentEmail);
+        // 3. Determinar rol con normalización estricta de correo
+        const cleanEmails = emails.map(e => (typeof e === 'string' ? e.toLowerCase().trim() : ''));
+        const foundUser = sList.find(u => (u.email || '').toLowerCase().trim() === currentEmail);
         const isMaster = currentEmail === 'jomartin8264@gmail.com';
-        const isAdminUser = isMaster || emails.map(e => e.toLowerCase()).includes(currentEmail) || foundUser?.role === 'admin';
-        const isEmployeeUser = foundUser?.role === 'employee';
+        const isAdminUser = isMaster || cleanEmails.includes(currentEmail) || foundUser?.role === 'admin';
+        const isEmployeeUser = foundUser?.role === 'employee' || Boolean(foundUser);
 
         if (isAdminUser) {
           setUserRole('admin');
@@ -130,7 +131,7 @@ const Admin = () => {
           setUserRole('employee');
           setIsAdmin(false);
         } else {
-          alert("Acceso denegado: Solo el personal autorizado (Administrador o Empleado) puede entrar aquí.");
+          alert(`Acceso denegado: El correo "${currentUser?.email}" no está registrado en el equipo de la tienda (Personal o Administrador).`);
           navigate('/');
           return;
         }

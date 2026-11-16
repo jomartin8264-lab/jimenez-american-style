@@ -261,6 +261,17 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * Para los empleados/cajeros, la pestaña no aparece en pantalla.
   * Si un empleado intenta acceder directamente o cambiar el estado a inventario, un `useEffect` de protección lo detecta y lo redirige automáticamente a la pestaña operativa de `🛒 Mostrador`.
 
+### V. Reconocimiento de Empleados en la Web y Acceso a Registrar Prendas
+* **Detección Automática de Personal en Navbar:**
+  * `Navbar.jsx` ahora consulta tanto `config/admins` como `config/staff`.
+  * Si un empleado o cajero inicia sesión en la tienda web (desde PC o celular), el sistema reconoce inmediatamente su rol y le muestra en la barra de navegación:
+    - **`⚡ REGISTRAR PRENDAS`** (enlace directo a `/admin` para dar de alta prendas, fotos, tallas y códigos).
+    - **`🏪 PUNTO DE VENTA`** (enlace a `/pos` para operar mostrador y caja).
+    - Badge identificador con su rol y nombre (`👔 Empleado: Nombre`).
+    - Iconos móviles dedicados (`PackagePlus` y `Store`) para facilitar el registro de prendas directamente con la cámara del celular.
+* **Permisos en Panel de Administración (`Admin.jsx`):**
+  * Empleados autenticados y registrados en `config/staff` tienen acceso total al formulario de alta, edición de prendas y subida de imágenes, manteniendo restringida la eliminación y cambios de configuración sensible al administrador.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes
