@@ -319,6 +319,20 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   4. **Filtro Estricto de Caja:**
      * Un pedido sellado o perteneciente a un `shiftId` cerrado queda 100% excluido del cálculo de `currentShiftWebCashOrders`, impidiendo cualquier duplicación de efectivo entre turnos.
 
+### CC. Control y Reinicio del Folio de Etiquetas (SKU / Códigos de Barra)
+* **Funcionalidad Implementada:**
+  * Se agregó la capacidad de reiniciar o cambiar el número de inicio de las etiquetas consecutivas de ropa (`ALN-XXXXX`) en cualquier momento.
+* **Ubicaciones:**
+  1. **En la ventana de Impresión de Etiquetas (`BatchBarcodeModal.jsx`):**
+     * Junto al rango consecutivo (`ALN-XXXXX ➔ ALN-YYYYY`), hay un botón **`⚙️ Reiniciar Folio`**.
+     * Permite escribir cualquier número inicial deseado o usar los accesos directos de 1 clic:
+       * `Poner 1 (ALN-00001)`
+       * `Poner 1001 (ALN-01001)`
+  2. **En Configuración del Sistema (`POS.jsx` > Administración > Configuración):**
+     * Tarjeta dedicada **`🏷️ Folios y Numeración de Etiquetas (SKU)`** con visualización en tiempo real del próximo folio a imprimir y controles de cambio.
+  3. **Módulo de Utilidad (`skuCounter.js`):**
+     * Función `resetSkuSequence(targetNumber)` que actualiza de forma atómica `config/counters -> skuSequence` en Firestore para que todos los dispositivos tomen el nuevo folio sincronizado al instante.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

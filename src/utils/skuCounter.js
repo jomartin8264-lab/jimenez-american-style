@@ -86,3 +86,25 @@ export async function peekNextSkuNumber() {
   }
   return 1001;
 }
+
+/**
+ * Reinicia o ajusta el contador atómico de SKUs/etiquetas a un número inicial deseado.
+ * @param {number} targetNumber El siguiente número a generar (ej. 1 para ALN-00001, o 1001 para ALN-01001)
+ * @returns {Promise<number>} El nuevo número inicial
+ */
+export async function resetSkuSequence(targetNumber = 1) {
+  try {
+    const counterRef = doc(db, "config", "counters");
+    const num = Math.max(1, parseInt(targetNumber, 10) || 1);
+    const baseSeq = num - 1;
+    await setDoc(counterRef, {
+      skuSequence: baseSeq,
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
+    return num;
+  } catch (e) {
+    console.error("Error al reiniciar contador de SKU:", e);
+    throw e;
+  }
+}
+

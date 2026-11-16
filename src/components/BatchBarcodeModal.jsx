@@ -7,7 +7,7 @@ import {
   Printer, X, CheckSquare, Square, CheckCircle2, 
   Clock, RotateCcw, Sparkles, Check, Zap, Layers, RefreshCw
 } from 'lucide-react';
-import { getNextConsecutiveSKUs, peekNextSkuNumber } from '../utils/skuCounter';
+import { getNextConsecutiveSKUs, peekNextSkuNumber, resetSkuSequence } from '../utils/skuCounter';
 
 function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   const svgRef = useRef(null);
@@ -83,7 +83,9 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const [mainMode, setMainMode] = useState('preprinted');
   const [blankCount, setBlankCount] = useState(24);
   const [nextStartSeq, setNextStartSeq] = useState(1001);
-  const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
+  const [showResetSkuInput, setShowResetSkuInput] = useState(false);
+  const [customStartSeq, setCustomStartSeq] = useState('1');
+  const [isResettingSku, setIsResettingSku] = useState(false);
   const [actualPrintedSkus, setActualPrintedSkus] = useState(null);
 
   // Consultar el siguiente número de SKU sin avanzar el contador (solo para vista previa)
@@ -518,9 +520,153 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '0.25rem' }}>
                       Rango de SKUs único y consecutivo:
                     </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
-                      ALN-{String(nextStartSeq).padStart(5, '0')} <span style={{ color: '#94a3b8' }}>➔</span> ALN-{String(nextStartSeq + blankCount - 1).padStart(5, '0')}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
+                        ALN-{String(nextStartSeq).padStart(5, '0')} <span style={{ color: '#94a3b8' }}>➔</span> ALN-{String(nextStartSeq + blankCount - 1).padStart(5, '0')}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomStartSeq(String(nextStartSeq));
+                          setShowResetSkuInput(!showResetSkuInput);
+                        }}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          color: '#38bdf8',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                        title="Reiniciar o ajustar el número inicial de etiquetas"
+                      >
+                        ⚙️ Reiniciar Folio
+                      </button>
                     </div>
+
+                    {showResetSkuInput && (
+                      <div style={{
+                        marginTop: '0.6rem',
+                        padding: '0.6rem',
+                        background: '#0f172a',
+                        borderRadius: '8px',
+                        border: '1px solid #334155',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.45rem'
+                      }}>
+                        <div style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 600 }}>
+                          ¿En qué número inicial deseas reiniciar las etiquetas?
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontFamily: 'monospace' }}>ALN-</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={customStartSeq}
+                            onChange={(e) => setCustomStartSeq(e.target.value)}
+                            placeholder="Ej. 1 o 1001"
+                            style={{
+                              flex: 1,
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '4px',
+                              background: '#1e293b',
+                              border: '1px solid #475569',
+                              color: '#fff',
+                              fontSize: '0.85rem',
+                              fontFamily: 'monospace'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={isResettingSku}
+                            onClick={async () => {
+                              const val = parseInt(customStartSeq, 10);
+                              if (isNaN(val) || val < 1) {
+                                alert("Por favor ingresa un número válido mayor o igual a 1.");
+                                return;
+                              }
+                              setIsResettingSku(true);
+                              try {
+                                const newSeq = await resetSkuSequence(val);
+                                setNextStartSeq(newSeq);
+                                setShowResetSkuInput(false);
+                                alert(`✅ Folio de etiquetas reiniciado exitosamente.\n\nLa siguiente etiqueta será: ALN-${String(newSeq).padStart(5, '0')}`);
+                              } catch (e) {
+                                alert("Error al reiniciar: " + e.message);
+                              } finally {
+                                setIsResettingSku(false);
+                              }
+                            }}
+                            style={{
+                              background: '#10b981',
+                              color: '#0f172a',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.4rem 0.8rem',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {isResettingSku ? '...' : 'Aplicar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowResetSkuInput(false)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid #475569',
+                              color: '#94a3b8',
+                              borderRadius: '4px',
+                              padding: '0.4rem 0.5rem',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setCustomStartSeq('1')}
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#94a3b8',
+                              fontSize: '0.68rem',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Poner 1 (ALN-00001)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCustomStartSeq('1001')}
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#94a3b8',
+                              fontSize: '0.68rem',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Poner 1001 (ALN-01001)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <CheckCircle2 size={13} /> Sincronizado en Firestore sin duplicados
                     </div>

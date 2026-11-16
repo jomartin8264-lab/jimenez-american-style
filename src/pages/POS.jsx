@@ -19,6 +19,7 @@ import { getProductImage } from '../utils/productImages';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import QuickProductEntryModal from '../components/QuickProductEntryModal';
+import { peekNextSkuNumber, resetSkuSequence } from '../utils/skuCounter';
 import useSEO from '../hooks/useSEO';
 import './POS.css';
 
@@ -187,6 +188,22 @@ export default function POS() {
     telegramChatId: '',
     imgbbApiKey: ''
   });
+
+  // Configuración de Folios y Numeración de Etiquetas
+  const [nextSkuPreview, setNextSkuPreview] = useState(1001);
+  const [skuInputVal, setSkuInputVal] = useState('1');
+  const [isUpdatingSkuSeq, setIsUpdatingSkuSeq] = useState(false);
+
+  useEffect(() => {
+    if (adminSection === 'config') {
+      peekNextSkuNumber().then(n => {
+        if (n) {
+          setNextSkuPreview(n);
+          setSkuInputVal(String(n));
+        }
+      });
+    }
+  }, [adminSection]);
 
   // Reloj en tiempo real
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
@@ -4687,6 +4704,139 @@ export default function POS() {
                   {savingInfo ? 'Guardando...' : 'Actualizar'}
                 </button>
               </form>
+            </div>
+
+            {/* CONTROL Y REINICIO DE FOLIO DE ETIQUETAS */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    🏷️ Folios y Numeración de Etiquetas (SKU)
+                  </h3>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    Ajusta o reinicia el número consecutivo para las etiquetas de código de barras de ropa.
+                  </p>
+                </div>
+                <div style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
+                  Próxima: ALN-{String(nextSkuPreview).padStart(5, '0')}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontFamily: 'monospace' }}>ALN-</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={skuInputVal}
+                    onChange={(e) => setSkuInputVal(e.target.value)}
+                    style={{
+                      width: '120px',
+                      padding: '0.55rem 0.75rem',
+                      borderRadius: '6px',
+                      background: '#0f172a',
+                      border: '1px solid #475569',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      fontFamily: 'monospace'
+                    }}
+                    placeholder="Ej. 1 o 1001"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isUpdatingSkuSeq}
+                  onClick={async () => {
+                    const val = parseInt(skuInputVal, 10);
+                    if (isNaN(val) || val < 1) {
+                      alert("Ingresa un número válido mayor o igual a 1");
+                      return;
+                    }
+                    if (!window.confirm(`¿Confirmas reiniciar el contador de etiquetas para que la siguiente sea ALN-${String(val).padStart(5, '0')}?`)) return;
+                    setIsUpdatingSkuSeq(true);
+                    try {
+                      const newSeq = await resetSkuSequence(val);
+                      setNextSkuPreview(newSeq);
+                      alert(`✅ Folio de etiquetas reiniciado exitosamente a ALN-${String(newSeq).padStart(5, '0')}`);
+                    } catch (e) {
+                      alert("Error al actualizar folio: " + e.message);
+                    } finally {
+                      setIsUpdatingSkuSeq(false);
+                    }
+                  }}
+                  style={{
+                    background: '#10b981',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.6rem 1.25rem',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  {isUpdatingSkuSeq ? 'Guardando...' : '💾 Establecer Folio'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm("¿Confirmas reiniciar el folio de etiquetas desde el número 1 (ALN-00001)?")) return;
+                    setIsUpdatingSkuSeq(true);
+                    try {
+                      const newSeq = await resetSkuSequence(1);
+                      setNextSkuPreview(newSeq);
+                      setSkuInputVal('1');
+                      alert("✅ Folio reiniciado a 1 (ALN-00001).");
+                    } catch (e) {
+                      alert("Error: " + e.message);
+                    } finally {
+                      setIsUpdatingSkuSeq(false);
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '6px',
+                    padding: '0.6rem 1rem',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🔄 Reiniciar a 1 (ALN-00001)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm("¿Confirmas reiniciar el folio de etiquetas desde el número 1001 (ALN-01001)?")) return;
+                    setIsUpdatingSkuSeq(true);
+                    try {
+                      const newSeq = await resetSkuSequence(1001);
+                      setNextSkuPreview(newSeq);
+                      setSkuInputVal('1001');
+                      alert("✅ Folio reiniciado a 1001 (ALN-01001).");
+                    } catch (e) {
+                      alert("Error: " + e.message);
+                    } finally {
+                      setIsUpdatingSkuSeq(false);
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '6px',
+                    padding: '0.6rem 1rem',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🔄 Reiniciar a 1001 (ALN-01001)
+                </button>
+              </div>
             </div>
 
             {/* APIs Y CANALES */}
