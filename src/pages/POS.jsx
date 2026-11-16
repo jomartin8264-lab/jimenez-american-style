@@ -114,6 +114,23 @@ export default function POS() {
   const [closeShiftNotes, setCloseShiftNotes] = useState('');
   const [lastClosedShiftReceipt, setLastClosedShiftReceipt] = useState(null);
 
+  // Helper de auditoría de pedidos web: verifica si un pedido ya fue cobrado y auditado en un corte de caja anterior
+  const isOrderAudited = (order) => {
+    if (!order) return false;
+    if (order.shiftClosed) return true;
+    if (order.shiftId) {
+      const shift = shiftsList.find(s => s.id === order.shiftId);
+      if (shift && shift.status === 'closed') return true;
+    }
+    if (order.status === 'entregado' && order.deliveredAtMillis && activeShift) {
+      const shiftStart = activeShift.openedAtMillis || (activeShift.openedAt?.seconds ? activeShift.openedAt.seconds * 1000 : 0);
+      if (order.deliveredAtMillis < shiftStart && order.shiftId !== activeShift.id) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Pedidos Web en Tiempo Real
   const [webOrders, setWebOrders] = useState([]);
   const [orderFilter, setOrderFilter] = useState('todos'); // 'todos', 'pendiente', 'en_camino', 'entregado'
@@ -1024,7 +1041,18 @@ export default function POS() {
       const shiftStart = activeShift.openedAtMillis || (activeShift.openedAt?.seconds ? activeShift.openedAt.seconds * 1000 : 0);
       const shiftSales = webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStart);
 
-      const cashSales = shiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      // Pedidos web cobrados en efectivo por mandaditos en este turno
+      const shiftWebCashOrders = webOrders.filter(o => 
+        o.type === 'web' && 
+        o.status === 'entregado' && 
+        o.addedToCash === true && 
+        !o.shiftClosed && 
+        (o.shiftId === activeShift.id || (!o.shiftId && (o.deliveredAtMillis || (o.deliveredAt?.seconds ? o.deliveredAt.seconds * 1000 : 0)) >= shiftStart))
+      );
+      const webCashSales = shiftWebCashOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+
+      const posCashSales = shiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      const cashSales = posCashSales + webCashSales;
       const cardSales = shiftSales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
       const transferSales = shiftSales.filter(s => s.paymentMethod === 'transferencia').reduce((acc, s) => acc + (Number(s.total) || 0), 0);
       const totalSales = cashSales + cardSales + transferSales;
@@ -1055,6 +1083,26 @@ export default function POS() {
       };
 
       await updateDoc(doc(db, "cash_shifts", activeShift.id), closedData);
+
+      // Sellar pedidos web cobrados en este turno para que queden permanentemente auditados y cerrados
+      if (shiftWebCashOrders.length > 0) {
+        try {
+          const batch = writeBatch(db);
+          shiftWebCashOrders.forEach(o => {
+            batch.update(doc(db, "orders", o.id), {
+              shiftClosed: true,
+              shiftClosedAt: serverTimestamp(),
+              shiftClosedAtMillis: Date.now(),
+              shiftClosedBy: currentUser.email,
+              shiftClosedCashier: activeShift.cashierName || currentUser.displayName || currentUser.email,
+              shiftId: activeShift.id
+            });
+          });
+          await batch.commit();
+        } catch (batchErr) {
+          console.error("Error al sellar pedidos web en corte:", batchErr);
+        }
+      }
 
       soundAlert('success');
       setShowCloseShiftModal(false);
@@ -1291,12 +1339,28 @@ export default function POS() {
     }
   };
 
-  // Cambiar estado de un pedido web con control de cobro para entregas
+  // Cambiar estado de un pedido web con control de cobro para entregas y auditoría de cortes
   const handleUpdateOrderStatus = async (orderId, newStatus, orderObj) => {
-    // Si van a marcar como entregado y es un pedido web: preguntar método de cobro
+    const order = orderObj || webOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // 1. REGLA ESTRICTA: Si el pedido ya fue cerrado en un corte de caja anterior, NO se puede alterar
+    if (isOrderAudited(order)) {
+      soundAlert('error');
+      alert(`🔒 PEDIDO AUDITADO Y CERRADO:\n\nEste pedido ya fue cobrado e ingresado en el corte de caja de un turno anterior (Atendido por: ${order.shiftClosedCashier || order.deliveredBy || 'Cajero anterior'}).\n\nNo se puede reactivar ni modificar para no alterar los cortes ya realizados.`);
+      return;
+    }
+
+    // 2. REGLA PARA EMPLEADOS: Los empleados no pueden reabrir ni modificar pedidos ya entregados
+    if (!isAdmin && order.status === 'entregado') {
+      soundAlert('error');
+      alert("⚠️ Solo los administradores pueden modificar o reabrir un pedido que ya fue marcado como ENTREGADO.");
+      return;
+    }
+
+    // 3. Si van a marcar como entregado y es un pedido web: preguntar método de cobro
     if (newStatus === 'entregado') {
-      const order = orderObj || webOrders.find(o => o.id === orderId);
-      if (order && order.type !== 'pos') {
+      if (order.type !== 'pos') {
         setDeliveringOrder(order);
         setShowDeliverPaymentModal(true);
         return;
@@ -1322,6 +1386,16 @@ export default function POS() {
   // Confirmar entrega con método de cobro (Transferencia vs Mandaditos / Efectivo)
   const handleConfirmDeliveryPayment = async (paymentType) => {
     if (!deliveringOrder) return;
+
+    // Verificación de seguridad: no permitir cobrar si ya fue auditado en turno anterior
+    if (isOrderAudited(deliveringOrder)) {
+      soundAlert('error');
+      alert(`🔒 PEDIDO YA AUDITADO:\n\nEste pedido ya fue entregado y cerrado en un turno de caja anterior.\nNo se puede volver a cobrar en el turno actual.`);
+      setShowDeliverPaymentModal(false);
+      setDeliveringOrder(null);
+      return;
+    }
+
     try {
       const orderId = deliveringOrder.id;
       const isCash = paymentType === 'mandaditos';
@@ -1393,7 +1467,16 @@ export default function POS() {
   const currentShiftPosSales = activeShift ? webOrders.filter(o => o.type === 'pos' && o.status !== 'cancelado' && (o.createdAtMillis || (o.createdAt?.seconds ? o.createdAt.seconds * 1000 : 0)) >= shiftStartMillis) : [];
   
   // 2. Pedidos Web entregados en este turno y cobrados por Mandaditos (Efectivo físico a caja)
-  const currentShiftWebCashOrders = activeShift ? webOrders.filter(o => o.type === 'web' && o.status === 'entregado' && o.addedToCash === true && (o.shiftId === activeShift.id || (o.deliveredAtMillis || (o.deliveredAt?.seconds ? o.deliveredAt.seconds * 1000 : 0)) >= shiftStartMillis)) : [];
+  const currentShiftWebCashOrders = activeShift ? webOrders.filter(o => {
+    if (o.type !== 'web') return false;
+    if (o.status !== 'entregado') return false;
+    if (!o.addedToCash) return false;
+    if (o.shiftClosed) return false;
+    if (o.shiftId && o.shiftId !== activeShift.id) return false;
+    const deliveredTime = o.deliveredAtMillis || (o.deliveredAt?.seconds ? o.deliveredAt.seconds * 1000 : 0);
+    if (!o.shiftId && deliveredTime < shiftStartMillis) return false;
+    return true;
+  }) : [];
   const currentShiftWebCashTotal = currentShiftWebCashOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
 
   const currentShiftSales = [...currentShiftPosSales, ...currentShiftWebCashOrders];
