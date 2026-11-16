@@ -432,19 +432,42 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccessMsg, setUpdateSuccessMsg] = useState('');
 
-  // Conectar clase especial al body para aislar la hoja en la impresion
+  // Conectar clase especial al body e inyectar @page en <head> para forzar horizontal/vertical en Chrome/Edge
   useEffect(() => {
     document.body.classList.add('batch-printing-active');
-    if (sheetLayout === 'opalina15' || sheetLayout === 'opalina10') {
+    
+    let styleTag = document.getElementById('batch-print-head-style');
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'batch-print-head-style';
+      document.head.appendChild(styleTag);
+    }
+
+    if (isOpalina) {
       document.body.classList.add('batch-printing-opalina');
+      styleTag.innerHTML = `
+        @page {
+          size: letter landscape !important;
+          margin: 0mm !important;
+        }
+      `;
     } else {
       document.body.classList.remove('batch-printing-opalina');
+      styleTag.innerHTML = `
+        @page {
+          size: letter portrait !important;
+          margin: 0mm !important;
+        }
+      `;
     }
+
     return () => {
       document.body.classList.remove('batch-printing-active');
       document.body.classList.remove('batch-printing-opalina');
+      const tag = document.getElementById('batch-print-head-style');
+      if (tag) tag.remove();
     };
-  }, [sheetLayout]);
+  }, [sheetLayout, isOpalina]);
 
   // Consultar el siguiente número de SKU sin avanzar el contador (solo para vista previa)
   useEffect(() => {
@@ -597,7 +620,6 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
     ? [] 
     : Object.keys(selectedIds).filter(id => selectedIds[id]);
   const totalLabelsToPrint = flatLabels.filter(l => !l.isBlank).length;
-  const isOpalina = sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
   const labelsPerPage = isOpalina ? (sheetLayout === 'opalina15' ? 15 : 10) : Number(sheetLayout);
   
   // Dividir en páginas exactas
@@ -1511,15 +1533,15 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
               className="batch-print-page"
               style={{
                 display: 'grid',
-                gridTemplateColumns: isOpalina ? 'repeat(5, 51.5mm)' : 'repeat(3, 1fr)',
-                gridTemplateRows: sheetLayout === 'opalina15' ? 'repeat(3, 64.5mm)' : (sheetLayout === 'opalina10' ? 'repeat(2, 98.5mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)')),
-                gap: isOpalina ? '2mm 2.5mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'),
+                gridTemplateColumns: isOpalina ? 'repeat(5, 50.5mm)' : 'repeat(3, 1fr)',
+                gridTemplateRows: sheetLayout === 'opalina15' ? 'repeat(3, 61mm)' : (sheetLayout === 'opalina10' ? 'repeat(2, 94mm)' : (sheetLayout === '24' ? 'repeat(8, 32.5mm)' : 'repeat(10, 26mm)')),
+                gap: isOpalina ? '1.5mm 2mm' : (sheetLayout === '24' ? '1mm 2.5mm' : '0.8mm 2mm'),
                 boxSizing: 'border-box',
-                padding: isOpalina ? '3mm 4mm' : '5mm 5mm',
+                padding: isOpalina ? '2mm 3mm' : '5mm 5mm',
                 width: '100%',
-                maxWidth: isOpalina ? '272mm' : '215mm',
-                height: isOpalina ? '206mm' : '272mm',
-                maxHeight: isOpalina ? '206mm' : '272mm',
+                maxWidth: isOpalina ? '265mm' : '215mm',
+                height: isOpalina ? '195mm' : '272mm',
+                maxHeight: isOpalina ? '195mm' : '272mm',
                 margin: '0 auto',
                 alignContent: 'start',
                 pageBreakInside: 'avoid',

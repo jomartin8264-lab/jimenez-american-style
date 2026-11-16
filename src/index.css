@@ -202,7 +202,6 @@ h1, h2, h3, h4, h5, h6 {
    REGLAS GLOBALES DE IMPRESIÓN (TICKETS Y ETIQUETAS)
    =================================================== */
 @page {
-  size: letter portrait;
   margin: 0mm;
 }
 
@@ -215,7 +214,6 @@ h1, h2, h3, h4, h5, h6 {
 
 @media print {
   @page {
-    size: letter portrait;
     margin: 0mm;
   }
 
@@ -266,14 +264,17 @@ h1, h2, h3, h4, h5, h6 {
     break-inside: avoid !important;
   }
 
-  /* Formato Opalina Horizontal (10 etiquetas colgantes 5x2) */
+  /* Formato Opalina Horizontal (15 o 10 etiquetas colgantes en 1 sola hoja) */
   body.batch-printing-active.batch-printing-opalina .batch-print-page {
-    width: 268mm !important;
-    max-width: 268mm !important;
-    height: 204mm !important;
-    max-height: 204mm !important;
+    width: 265mm !important;
+    max-width: 265mm !important;
+    height: 195mm !important;
+    max-height: 195mm !important;
     padding: 2mm 3mm !important;
     margin: 0 auto !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   body.batch-printing-active #batch-print-portal * {
