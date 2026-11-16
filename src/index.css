@@ -254,14 +254,16 @@ h1, h2, h3, h4, h5, h6 {
 
   body.batch-printing-active .batch-print-page {
     box-sizing: border-box !important;
-    width: 215mm !important;
-    max-width: 215mm !important;
-    height: 272mm !important;
-    max-height: 272mm !important;
+    width: 100% !important;
+    max-width: 185mm !important;
+    height: auto !important;
+    max-height: 220mm !important;
     margin: 0 auto !important;
     overflow: hidden !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   /* Formato Horizontal (15 o 10 etiquetas colgantes en 1 sola hoja) */
