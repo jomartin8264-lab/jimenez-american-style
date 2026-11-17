@@ -345,6 +345,21 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * **Código de Barras CODE128 + SKU:** Altura e intensidad calibrada para pistolas lectoras y escáneres de smartphone.
   * **Compatibilidad:** Selector de formato en `BatchBarcodeModal.jsx` permite alternar entre `🏷️ Opalina 10 (Hangtag Boutique 2x5 con Logo)`, `24 (3x8)` y `30 (3x10)`.
 
+### EE. Bloqueo y Autenticación Obligatoria de Cajero en Terminal (`Iniciar-POS.bat`)
+* **Problema Resuelto:**
+  * Al iniciar el Punto de Venta desde el acceso directo `Iniciar-POS.bat`, la sesión residual almacenada en el navegador ingresaba directamente a `/pos` sin detenerse a solicitar usuario y contraseña.
+* **Solución Implementada:**
+  1. **Enrutamiento Estricto:** `server.cjs` ahora abre explícitamente `http://localhost:4500/login?pos=1&fresh=1`.
+  2. **Protección de Sesión por Ventana (`sessionStorage`):** `POS.jsx` valida la presencia de `sessionStorage.getItem('alina_pos_authenticated')`. Si no existe autenticación explícita en la ventana actual, revoca cualquier sesión residual de Firebase con `logout()` y redirige obligatoriamente al login.
+  3. **Control en Login:** Al autenticarse correctamente mediante correo y contraseña, se sella la llave de sesión en `sessionStorage` y se da acceso fluido al POS. Las recargas de página (F5) dentro de un turno mantienen la sesión activa sin interrupciones.
+
+### FF. Rediseño de Etiquetas Hangtag Opalina 10 (Logo Ampliado y Código Visible)
+* **Mejoras Implementadas:**
+  1. **Logo Principal Más Grande:** Se incrementó el diámetro de la insignia dorada de 28mm a 36mm en impresión (y de 82px a 106px en previsualización), con tipografía de marca aumentada proporcionalmente.
+  2. **Eliminación del Espacio en Blanco Muerto:** Se unificó la información de la prenda, tallas, precio y código de barras en un contenedor vertical continuo, eliminando el `marginTop: auto` que empujaba el código al fondo y dejaba un vacío de varios centímetros entre precio y código.
+  3. **Código de Barras Más Grande y Nítido:** Altura de barras incrementada de 11 a 19 y grosor de trazo aumentado a 1.25 con tipografía de SKU ampliada a 8px monospace negrita, permitiendo lectura visual inmediata y escaneo ultra rápido con cualquier pistola o teléfono.
+  4. **Predeterminado:** Formato `opalina10` establecido como opción inicial al abrir el modal de etiquetas.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

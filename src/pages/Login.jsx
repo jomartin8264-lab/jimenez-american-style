@@ -31,16 +31,18 @@ const Login = () => {
 
   // Si se abre desde el acceso directo del POS (fresh=1), forzar cierre de sesión residual
   // para que siempre solicite credenciales al empleado o administrador que toma el equipo
-  const hasLoggedOutRef = useRef(false);
+  const isLoggingInRef = useRef(false);
+  const initialLogoutAttemptedRef = useRef(false);
   useEffect(() => {
-    if (isPos && isFresh && currentUser && !hasLoggedOutRef.current) {
-      hasLoggedOutRef.current = true;
+    if (isPos && isFresh && !initialLogoutAttemptedRef.current && !isLoggingInRef.current) {
+      initialLogoutAttemptedRef.current = true;
       logout().catch(console.error);
     }
-  }, [isPos, isFresh, currentUser, logout]);
+  }, [isPos, isFresh, logout]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    isLoggingInRef.current = true;
     setError('');
     setMessage('');
     setLoading(true);
@@ -48,6 +50,7 @@ const Login = () => {
     if (!isLogin && password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       setLoading(false);
+      isLoggingInRef.current = false;
       return;
     }
 
@@ -64,11 +67,13 @@ const Login = () => {
       }
       // Redirigir al POS si venía en modo punto de venta, o al inicio web
       if (isPos) {
+        sessionStorage.setItem('alina_pos_authenticated', '1');
         navigate('/pos');
       } else {
         navigate('/');
       }
     } catch (err) {
+      isLoggingInRef.current = false;
       setError('Error al autenticar: ' + err.message);
     }
     setLoading(false);

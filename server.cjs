@@ -60,7 +60,7 @@ const server = http.createServer((req, res) => {
 function launchBrowser() {
   const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-  const appUrl = `http://localhost:${PORT}/pos`;
+  const appUrl = `http://localhost:${PORT}/login?pos=1&fresh=1`;
   
   let browserCmd;
   if (fs.existsSync(chromePath)) {

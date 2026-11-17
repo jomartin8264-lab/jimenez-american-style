@@ -71,12 +71,12 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
   const itemSize = (item.size || '').toUpperCase().trim();
 
   const logoSize = isPrint 
-    ? (isOpalina10 ? '28mm' : (isOpalina9 ? '21mm' : (isOpalina20 ? '13mm' : '16mm')))
-    : (isOpalina10 ? '82px' : (isOpalina9 ? '72px' : (isOpalina20 ? '48px' : '58px')));
+    ? (isOpalina10 ? '36mm' : (isOpalina9 ? '26mm' : (isOpalina20 ? '16mm' : '22mm')))
+    : (isOpalina10 ? '106px' : (isOpalina9 ? '82px' : (isOpalina20 ? '54px' : '72px')));
 
   const barcodeH = isPrint 
-    ? (isOpalina10 ? 11 : (isOpalina9 ? 8 : (isOpalina20 ? 5.5 : 7))) 
-    : 12;
+    ? (isOpalina10 ? 19 : (isOpalina9 ? 14 : (isOpalina20 ? 8 : 12))) 
+    : (isOpalina10 ? 20 : 15);
 
   return (
     <div
@@ -91,8 +91,8 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: isPrint 
-          ? (isOpalina9 ? '2mm 2mm 1.5mm 2mm' : '1.2mm 1.2mm 1mm 1.2mm') 
-          : '7px 7px 5px 7px',
+          ? (isOpalina10 ? '2mm 2.5mm 1.5mm 2.5mm' : (isOpalina9 ? '2mm 2mm 1.5mm 2mm' : '1.2mm 1.2mm 1mm 1.2mm')) 
+          : '8px 8px 6px 8px',
         boxSizing: 'border-box',
         height: '100%',
         maxHeight: '100%',
@@ -164,35 +164,42 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
         />
         <div style={{ 
           fontFamily: "'Outfit', 'Georgia', serif", 
-          fontSize: isPrint ? (isOpalina10 ? '9.5px' : '7.5px') : (isOpalina10 ? '12px' : '10px'), 
+          fontSize: isPrint ? (isOpalina10 ? '11px' : '8.5px') : (isOpalina10 ? '14px' : '11px'), 
           fontWeight: 900, 
-          letterSpacing: '0.3px', 
+          letterSpacing: '0.4px', 
           color: '#0f172a',
           lineHeight: 1.1,
-          marginTop: '1.5px'
+          marginTop: '2px'
         }}>
           Jiménez
         </div>
         <div style={{ 
-          fontSize: isPrint ? (isOpalina10 ? '5.2px' : '4.5px') : (isOpalina10 ? '7.5px' : '6px'), 
+          fontSize: isPrint ? (isOpalina10 ? '6px' : '5px') : (isOpalina10 ? '8.5px' : '7px'), 
           fontWeight: 800, 
           color: '#b45309', 
-          letterSpacing: '1px', 
+          letterSpacing: '1.2px', 
           textTransform: 'uppercase',
-          lineHeight: 1
+          lineHeight: 1,
+          marginTop: '1px'
         }}>
           AMERICAN STYLE
         </div>
       </div>
 
-      {/* LÍNEA DIVISORIA */}
-      <div style={{ borderTop: '0.5px solid #e2e8f0', margin: isPrint ? '1.5px 0' : '2px 0' }} />
+      {/* BLOQUE DE INFORMACIÓN UNIFICADO: PRENDA, TALLAS, PRECIO Y CÓDIGO DE BARRAS (Sin espacio en blanco muerto) */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: isPrint ? (isOpalina10 ? '2mm' : '1.2mm') : '4px',
+        textAlign: 'center',
+        marginTop: isPrint ? '1.5mm' : '4px'
+      }}>
+        <div style={{ borderTop: '0.6px solid #e2e8f0', margin: '0 2px' }} />
 
-      {/* 3. DETALLE DE PRENDA, TALLAS Y PRECIO */}
-      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: isPrint ? '1px' : '2px' }}>
+        {/* NOMBRE DE LA PRENDA */}
         <div style={{
-          fontSize: isPrint ? (isOpalina10 ? '7.5px' : '6.5px') : (isOpalina10 ? '10px' : '8.5px'),
-          fontWeight: 700,
+          fontSize: isPrint ? (isOpalina10 ? '8.5px' : '7px') : (isOpalina10 ? '11px' : '9px'),
+          fontWeight: 800,
           color: '#1e293b',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -204,7 +211,7 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
         </div>
 
         {/* CASILLAS DE TALLA */}
-        <div style={{ marginTop: '0.5px' }}>
+        <div>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(5, 1fr)',
@@ -229,7 +236,7 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
                     backgroundColor: isMatch ? '#0f172a' : '#ffffff',
                     color: isMatch ? '#ffffff' : '#0f172a',
                     fontWeight: 800,
-                    fontSize: isPrint ? (isOpalina10 ? '5.5px' : '4.8px') : (isOpalina10 ? '8px' : '7px'),
+                    fontSize: isPrint ? (isOpalina10 ? '5.8px' : '4.8px') : (isOpalina10 ? '8.5px' : '7px'),
                     padding: isPrint ? '0.8px 0' : '1.5px 0',
                     textAlign: 'center',
                     lineHeight: 1,
@@ -251,57 +258,57 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
 
         {/* CUADRO DE PRECIO */}
         <div style={{ 
-          marginTop: '1px', 
-          padding: isPrint ? '1px 3px' : '2px 4px', 
+          padding: isPrint ? '1.5px 3px' : '3px 4px', 
           backgroundColor: '#f8fafc', 
           borderRadius: '3px',
-          border: '0.5px solid #cbd5e1'
+          border: '0.6px solid #cbd5e1'
         }}>
           {item.isPreprinted || item.price == null ? (
-            <div style={{ fontSize: isPrint ? (isOpalina10 ? '7.5px' : '6.5px') : (isOpalina10 ? '10px' : '8.5px'), fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', lineHeight: 1 }}>
+            <div style={{ fontSize: isPrint ? (isOpalina10 ? '8.5px' : '7px') : (isOpalina10 ? '11px' : '9px'), fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', lineHeight: 1 }}>
               PRECIO: $ ________
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', lineHeight: 1 }}>
-              <span style={{ fontSize: isPrint ? '5px' : '7px', color: '#64748b', fontWeight: 700 }}>PRECIO:</span>
-              <span style={{ fontSize: isPrint ? (isOpalina10 ? '10.5px' : '9px') : (isOpalina10 ? '13px' : '11px'), fontWeight: 900, color: '#0f172a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', lineHeight: 1 }}>
+              <span style={{ fontSize: isPrint ? '6px' : '8px', color: '#64748b', fontWeight: 800 }}>PRECIO:</span>
+              <span style={{ fontSize: isPrint ? (isOpalina10 ? '12px' : '10px') : (isOpalina10 ? '15px' : '12px'), fontWeight: 900, color: '#0f172a' }}>
                 ${Number(item.price).toFixed(2)}
               </span>
             </div>
           )}
         </div>
-      </div>
 
-      {/* 4. BLOQUE INFERIOR: CÓDIGO DE BARRAS + SKU + REDES */}
-      <div style={{ 
-        marginTop: 'auto',
-        paddingTop: isPrint ? '1.5px' : '3px',
-        borderTop: '0.6px solid #e2e8f0',
-        textAlign: 'center'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '0.5px 0' }}>
-          <BarcodeSVG code={item.code} height={barcodeH} width={isPrint ? 1.0 : 1.05} />
-        </div>
-
+        {/* CÓDIGO DE BARRAS + SKU + REDES (Inmediatamente debajo del precio, visible y amplio) */}
         <div style={{ 
-          fontFamily: 'monospace', 
-          fontSize: isPrint ? (isOpalina10 ? '6.8px' : '6px') : (isOpalina10 ? '9px' : '7.5px'), 
-          fontWeight: 800, 
-          letterSpacing: '0.8px',
-          color: '#0f172a',
-          lineHeight: 1
+          borderTop: '0.6px solid #e2e8f0', 
+          paddingTop: isPrint ? '1.5mm' : '3px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: isPrint ? '0.8mm' : '2px'
         }}>
-          {item.code}
-        </div>
+          <div style={{ display: 'flex', justifyContent: 'center', margin: 0, width: '100%' }}>
+            <BarcodeSVG code={item.code} height={barcodeH} width={isPrint ? (isOpalina10 ? 1.25 : 1.15) : 1.15} />
+          </div>
 
-        <div style={{ 
-          fontSize: isPrint ? (isOpalina10 ? '4.2px' : '3.6px') : (isOpalina10 ? '6.5px' : '5.5px'), 
-          color: '#64748b', 
-          marginTop: '1px',
-          letterSpacing: '0.2px',
-          lineHeight: 1
-        }}>
-          @jimenezamericanstyle
+          <div style={{ 
+            fontFamily: 'monospace', 
+            fontSize: isPrint ? (isOpalina10 ? '8px' : '6.5px') : (isOpalina10 ? '10.5px' : '8.5px'), 
+            fontWeight: 800, 
+            letterSpacing: '0.8px',
+            color: '#0f172a',
+            lineHeight: 1
+          }}>
+            {item.code}
+          </div>
+
+          <div style={{ 
+            fontSize: isPrint ? (isOpalina10 ? '5px' : '4px') : (isOpalina10 ? '7px' : '6px'), 
+            color: '#64748b', 
+            letterSpacing: '0.2px',
+            lineHeight: 1
+          }}>
+            @jimenezamericanstyle
+          </div>
         </div>
       </div>
     </div>
@@ -401,7 +408,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
   const labeledProducts = products.filter(p => p.labeled === true);
 
   // Formato de hoja: 'opalina16' (4x4), 'opalina20' (4x5), 'opalina12' (3x4), 'opalina9' (3x3), 'opalina15', 'opalina10', '24', '30'
-  const [sheetLayout, setSheetLayout] = useState('opalina16');
+  const [sheetLayout, setSheetLayout] = useState('opalina10');
   const isOpalina = sheetLayout.startsWith('opalina');
   const isLandscape = sheetLayout === 'opalina15' || sheetLayout === 'opalina10';
 

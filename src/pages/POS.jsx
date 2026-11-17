@@ -203,7 +203,14 @@ export default function POS() {
   useEffect(() => {
     const checkAuthAndRoles = async () => {
       if (!currentUser) {
-        navigate('/login?pos=1');
+        navigate('/login?pos=1&fresh=1');
+        return;
+      }
+
+      // Protección de terminal: Requerir autenticación explícita en cada apertura de ventana
+      if (!sessionStorage.getItem('alina_pos_authenticated')) {
+        await logout();
+        navigate('/login?pos=1&fresh=1');
         return;
       }
       try {
@@ -1144,8 +1151,9 @@ export default function POS() {
   const executeLogout = async () => {
     try {
       setShowLogoutConfirmModal(false);
+      sessionStorage.removeItem('alina_pos_authenticated');
       await logout();
-      navigate('/login?pos=1');
+      navigate('/login?pos=1&fresh=1');
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
       alert("No se pudo cerrar la sesión: " + (err.message || err));
