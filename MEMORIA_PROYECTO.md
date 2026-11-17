@@ -359,13 +359,15 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   2. **Eliminación del Espacio en Blanco Muerto:** Se unificó la información de la prenda, tallas, precio y código de barras en un contenedor vertical continuo, eliminando el `marginTop: auto` que empujaba el código al fondo y dejaba un vacío de varios centímetros entre precio y código.
   3. **Código de Barras Más Grande y Nítido:** Altura de barras incrementada de 11 a 19 y grosor de trazo aumentado a 1.25-1.35 con tipografía de SKU ampliada a 8px monospace negrita, permitiendo lectura visual inmediata y escaneo ultra rápido con cualquier pistola o teléfono.
 
-### GG. Nuevo Formato Opalina 8: 4 Etiquetas por Línea (Carta Horizontal 4x2)
-* **Motivo:** Con 5 columnas por fila, las etiquetas eran demasiado angostas (~50mm), truncando nombres largos ("MODA AMERI...") y desbordando el margen inferior de la hoja.
-* **Características del Formato Opalina 8 (Recomendado y Predeterminado):**
-  * **Distribución:** 4 columnas x 2 filas = 8 etiquetas por hoja Carta Horizontal (Landscape).
-  * **Ancho ampliado:** Cada etiqueta pasa de ~50mm a **63mm de ancho**, dando espacio completo para el nombre sin cortes ni puntos suspensivos ("MODA AMERICANA").
-  * **Alto optimizado:** Altura de 93mm que garantiza que ambas filas quepan al 100% en una sola hoja Carta sin cortarse en el borde inferior.
-  * **Ajuste de Códigos Libres:** La cantidad inicial de etiquetas a imprimir se ajusta a múltiplos de 8 (8 por hoja, 16 para 2 hojas, etc.).
+### GG. Formatos Hangtag Opalina: Carta Vertical 4x4 (16 por Hoja) y Opciones
+* **Ajuste de Orientación y Tamaño Compacto:**
+  * La impresora HP Smart Tank alimenta el papel en **Carta VERTICAL (Portrait)**. El formato horizontal dejaba la mitad inferior en blanco si el controlador forzaba vertical.
+  * **Nuevo Predeterminado: `Opalina 16 (Carta Vertical 4x4)`:**
+    * **Distribución:** 4 columnas × 4 filas = 16 etiquetas por hoja Carta Vertical.
+    * **Dimensiones Compactas:** 46.5 mm de ancho × 59 mm de alto con logo de 23 mm y código de barras nítido de 12 mm.
+    * **Aprovechamiento Total:** Llena la hoja completa en orientación Vertical natural sin huecos ni desbordes.
+  * **Alternativa Mediana: `Opalina 12 (Carta Vertical 4x3)`:** 4 columnas × 3 filas = 12 etiquetas (46.5 mm × 76 mm) para prendas que requieran etiqueta un poco más alta.
+  * **Alternativa Grande: `Opalina 8 (Carta Horizontal 4x2)`:** 4 columnas × 2 filas = 8 etiquetas (63 mm × 93 mm).
 
 ---
 
