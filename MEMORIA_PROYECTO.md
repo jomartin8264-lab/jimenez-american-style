@@ -353,12 +353,19 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   2. **Protección de Sesión por Ventana (`sessionStorage`):** `POS.jsx` valida la presencia de `sessionStorage.getItem('alina_pos_authenticated')`. Si no existe autenticación explícita en la ventana actual, revoca cualquier sesión residual de Firebase con `logout()` y redirige obligatoriamente al login.
   3. **Control en Login:** Al autenticarse correctamente mediante correo y contraseña, se sella la llave de sesión en `sessionStorage` y se da acceso fluido al POS. Las recargas de página (F5) dentro de un turno mantienen la sesión activa sin interrupciones.
 
-### FF. Rediseño de Etiquetas Hangtag Opalina 10 (Logo Ampliado y Código Visible)
+### FF. Rediseño de Etiquetas Hangtag Opalina (Logo Ampliado y Código Visible)
 * **Mejoras Implementadas:**
   1. **Logo Principal Más Grande:** Se incrementó el diámetro de la insignia dorada de 28mm a 36mm en impresión (y de 82px a 106px en previsualización), con tipografía de marca aumentada proporcionalmente.
   2. **Eliminación del Espacio en Blanco Muerto:** Se unificó la información de la prenda, tallas, precio y código de barras en un contenedor vertical continuo, eliminando el `marginTop: auto` que empujaba el código al fondo y dejaba un vacío de varios centímetros entre precio y código.
-  3. **Código de Barras Más Grande y Nítido:** Altura de barras incrementada de 11 a 19 y grosor de trazo aumentado a 1.25 con tipografía de SKU ampliada a 8px monospace negrita, permitiendo lectura visual inmediata y escaneo ultra rápido con cualquier pistola o teléfono.
-  4. **Predeterminado:** Formato `opalina10` establecido como opción inicial al abrir el modal de etiquetas.
+  3. **Código de Barras Más Grande y Nítido:** Altura de barras incrementada de 11 a 19 y grosor de trazo aumentado a 1.25-1.35 con tipografía de SKU ampliada a 8px monospace negrita, permitiendo lectura visual inmediata y escaneo ultra rápido con cualquier pistola o teléfono.
+
+### GG. Nuevo Formato Opalina 8: 4 Etiquetas por Línea (Carta Horizontal 4x2)
+* **Motivo:** Con 5 columnas por fila, las etiquetas eran demasiado angostas (~50mm), truncando nombres largos ("MODA AMERI...") y desbordando el margen inferior de la hoja.
+* **Características del Formato Opalina 8 (Recomendado y Predeterminado):**
+  * **Distribución:** 4 columnas x 2 filas = 8 etiquetas por hoja Carta Horizontal (Landscape).
+  * **Ancho ampliado:** Cada etiqueta pasa de ~50mm a **63mm de ancho**, dando espacio completo para el nombre sin cortes ni puntos suspensivos ("MODA AMERICANA").
+  * **Alto optimizado:** Altura de 93mm que garantiza que ambas filas quepan al 100% en una sola hoja Carta sin cortarse en el borde inferior.
+  * **Ajuste de Códigos Libres:** La cantidad inicial de etiquetas a imprimir se ajusta a múltiplos de 8 (8 por hoja, 16 para 2 hojas, etc.).
 
 ---
 
