@@ -4929,7 +4929,7 @@ export default function POS() {
                     cursor: 'pointer'
                   }}
                 >
-                  <Printer size={16} /> Imprimir Ticket
+                  <Printer size={16} /> Imprimir Ticket (Térmica POS-58)
                 </button>
                 <button
                   onClick={() => setIsEditingReceipt(!isEditingReceipt)}
@@ -5876,7 +5876,7 @@ export default function POS() {
                     fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
                   }}
                 >
-                  <Printer size={16} /> Imprimir Ticket de Corte
+                  <Printer size={16} /> Imprimir Ticket (Térmica POS-58) de Corte
                 </button>
               </div>
 

@@ -1392,8 +1392,13 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                 alignItems: 'center',
                 backgroundColor: '#1e293b'
               }}>
-                <div style={{ fontSize: '0.85rem' }}>
-                  <strong>{totalLabelsToPrint}</strong> etiqueta(s) a imprimir en <strong>{totalPages}</strong> hoja(s) carta.
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <div style={{ fontSize: '0.85rem' }}>
+                    <strong>{totalLabelsToPrint}</strong> etiqueta(s) a imprimir en <strong>{totalPages}</strong> hoja(s) carta.
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#38bdf8' }}>
+                    🖨️ En la ventana que se abrirá, elige tu <strong>impresora de inyección de tinta</strong> y papel <strong>Carta</strong>.
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1417,7 +1422,7 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                   {isGeneratingBatch ? (
                     <><RefreshCw size={16} className="animate-spin" /> Guardando contador...</>
                   ) : (
-                    <><Printer size={16} /> Imprimir {mainMode === 'preprinted' ? `${blankCount} Códigos Consecutivos` : `Hoja (${totalPages} pág)`}</>
+                    <><Printer size={16} /> Imprimir {mainMode === 'preprinted' ? `${blankCount} Códigos en Inyección` : `Hoja en Inyección (${totalPages} pág)`}</>
                   )}
                 </button>
               </div>
