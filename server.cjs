@@ -76,10 +76,8 @@ function launchBrowser() {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    // El servidor ya está activo en segundo plano
-    if (!process.argv.includes('--no-launch')) {
-      launchBrowser();
-    }
+    // El servidor ya está activo en segundo plano, abrimos la ventana
+    launchBrowser();
   } else {
     console.error('Error en el servidor:', err);
   }
@@ -89,7 +87,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
   console.log(`  Punto de Venta Alina iniciado en puerto ${PORT}`);
   console.log(`===============================================`);
-  if (!process.argv.includes('--no-launch')) {
-    launchBrowser();
-  }
+  launchBrowser();
 });
