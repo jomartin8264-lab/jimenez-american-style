@@ -4815,49 +4815,49 @@ export default function POS() {
             )}
 
             {/* PAPEL DEL TICKET (LO QUE SE IMPRIME) */}
-            <div id="printable-ticket" className="pos-receipt-paper">
+            <div id="printable-ticket" className="pos-receipt-paper" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif', color: '#000' }}>
               <div style={{ textAlign: 'center', marginBottom: '0.6rem' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '1.15rem', letterSpacing: '0.5px' }}>
+                <div style={{ fontWeight: 900, fontSize: '18px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                   {ticketConfig.storeName || 'TIENDA ALINA'}
                 </div>
                 {ticketConfig.storeSubtitle && (
-                  <div style={{ fontSize: '0.8rem', color: '#444', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#000', marginTop: '0.1rem' }}>
                     {ticketConfig.storeSubtitle}
                   </div>
                 )}
                 {ticketConfig.storeAddress && (
-                  <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#000', marginTop: '0.1rem' }}>
                     {ticketConfig.storeAddress}
                   </div>
                 )}
                 {ticketConfig.storePhone && (
-                  <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#000' }}>
                     {ticketConfig.storePhone}
                   </div>
                 )}
-                <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ marginTop: '0.4rem', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   {lastReceipt.type === 'pos' ? '• VENTA EN MOSTRADOR •' : '• PEDIDO WEB / ENVÍO •'}
                 </div>
                 <div style={{ 
                   margin: '0.35rem 0', 
-                  fontSize: '1.05rem', 
-                  fontWeight: 800, 
+                  fontSize: '15px', 
+                  fontWeight: 900, 
                   letterSpacing: '1px',
-                  borderTop: '1px dashed #bbb',
-                  borderBottom: '1px dashed #bbb',
-                  padding: '0.25rem 0',
+                  borderTop: '2px dashed #000',
+                  borderBottom: '2px dashed #000',
+                  padding: '0.3rem 0',
                   color: '#000'
                 }}>
                   FOLIO: {lastReceipt.folio || getOrderFolio(lastReceipt)}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#666' }}>Fecha: {lastReceipt.dateFormatted}</div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#000' }}>Fecha: {lastReceipt.dateFormatted}</div>
               </div>
 
-              <div style={{ borderBottom: '1px dashed #777', margin: '0.4rem 0' }} />
+              <div style={{ borderBottom: '2px dashed #000', margin: '0.4rem 0' }} />
 
               {/* Datos del Cliente si existen */}
               {(lastReceipt.clientName || lastReceipt.clientPhone || lastReceipt.clientAddress || lastReceipt.clientNotes) && (
-                <div style={{ fontSize: '0.75rem', marginBottom: '0.4rem' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#000', marginBottom: '0.4rem' }}>
                   {lastReceipt.clientName && <div><strong>Cliente:</strong> {lastReceipt.clientName}</div>}
                   {lastReceipt.clientPhone && <div><strong>Tel:</strong> {lastReceipt.clientPhone}</div>}
                   {lastReceipt.clientAddress && <div><strong>Dirección:</strong> {lastReceipt.clientAddress}</div>}
@@ -4865,46 +4865,46 @@ export default function POS() {
                 </div>
               )}
 
-              <div style={{ borderBottom: '1px dashed #777', margin: '0.4rem 0' }} />
+              <div style={{ borderBottom: '2px dashed #000', margin: '0.4rem 0' }} />
 
               {/* Desglose de artículos */}
-              <div style={{ fontSize: '0.8rem' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#000' }}>
                 {(lastReceipt.items || []).map((it, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                    <span style={{ maxWidth: '72%', wordBreak: 'break-word' }}>
-                      <strong>{it.quantity}x {it.name}</strong>
+                    <span style={{ maxWidth: '70%', wordBreak: 'break-word' }}>
+                      <strong style={{ fontSize: '13.5px', fontWeight: 800 }}>{it.quantity}x {it.name}</strong>
                       {(it.code || it.sku) && (
-                        <div style={{ fontSize: '0.68rem', color: '#555', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#000', fontFamily: 'monospace' }}>
                           SKU: {it.code || it.sku}
                         </div>
                       )}
                     </span>
-                    <span style={{ fontWeight: 600 }}>${(it.price * it.quantity).toFixed(2)}</span>
+                    <span style={{ fontWeight: 800, fontSize: '14px' }}>${(it.price * it.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
 
-              <div style={{ borderBottom: '1px dashed #777', margin: '0.5rem 0' }} />
+              <div style={{ borderBottom: '2px dashed #000', margin: '0.5rem 0' }} />
 
               {/* Totales */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.05rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '17px', color: '#000' }}>
                 <span>TOTAL:</span>
                 <span>${Number(lastReceipt.total || 0).toFixed(2)} MXN</span>
               </div>
 
-              <div style={{ fontSize: '0.78rem', color: '#444', marginTop: '0.3rem' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#000', marginTop: '0.3rem' }}>
                 Método de Pago: {(lastReceipt.paymentMethod || 'Efectivo').toUpperCase()}
               </div>
               {lastReceipt.paymentMethod === 'efectivo' && (
-                <div style={{ fontSize: '0.75rem', color: '#444' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#000' }}>
                   Recibido: ${Number(lastReceipt.cashGiven || lastReceipt.total).toFixed(2)} | Cambio: ${Number(lastReceipt.change || 0).toFixed(2)}
                 </div>
               )}
 
-              <div style={{ borderBottom: '1px dashed #777', margin: '0.5rem 0' }} />
+              <div style={{ borderBottom: '2px dashed #000', margin: '0.5rem 0' }} />
 
               {/* Mensaje de pie / Políticas */}
-              <div style={{ textAlign: 'center', marginTop: '0.6rem', fontSize: '0.72rem', color: '#333', whiteSpace: 'pre-line' }}>
+              <div style={{ textAlign: 'center', marginTop: '0.6rem', fontSize: '12px', fontWeight: 700, color: '#000', whiteSpace: 'pre-line' }}>
                 {ticketConfig.footerMessage || '¡Gracias por tu compra! ✨'}
               </div>
             </div>
@@ -5736,7 +5736,7 @@ export default function POS() {
           <div className="pos-receipt-box" onClick={(e) => e.stopPropagation()}>
             {/* TICKET IMPRESO */}
             <div id="printable-shift-receipt" style={{
-              fontFamily: '"Courier New", Courier, monospace',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif', fontWeight: 600,
               fontSize: '12px',
               lineHeight: '1.35',
               color: '#000',
