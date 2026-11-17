@@ -4754,7 +4754,7 @@ export default function POS() {
           <div className="pos-receipt-box" onClick={(e) => e.stopPropagation()}>
             {/* Panel de edición opcional antes de imprimir */}
             {isEditingReceipt && (
-              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.85rem', marginBottom: '1rem', color: '#1e293b' }}>
+              <div className="no-print" style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.85rem', marginBottom: '1rem', color: '#1e293b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>✏️ Editar Datos de este Ticket</strong>
                   <button 
@@ -4910,7 +4910,7 @@ export default function POS() {
             </div>
 
             {/* BOTONES DE ACCIÓN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   onClick={() => window.print()}
@@ -5854,7 +5854,7 @@ export default function POS() {
             </div>
 
             {/* BOTONES DE ACCIÓN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem' }}>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
                   type="button"
