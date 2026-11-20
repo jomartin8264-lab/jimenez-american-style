@@ -7,7 +7,7 @@ import {
   Printer, X, CheckSquare, Square, CheckCircle2, 
   Clock, RotateCcw, Sparkles, Check, Zap, Layers, RefreshCw
 } from 'lucide-react';
-import { getNextConsecutiveSKUs, peekNextSkuNumber } from '../utils/skuCounter';
+import { getNextConsecutiveSKUs, peekNextSkuNumber, resetSkuSequence } from '../utils/skuCounter';
 
 function BarcodeSVG({ code, height = 15, width = 1.2 }) {
   const svgRef = useRef(null);
@@ -413,6 +413,23 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
 
   // Formato de hoja: 'opalina16' (4x4), 'opalina20' (4x5), 'opalina12' (3x4), 'opalina9' (3x3), 'opalina15', 'opalina10', '24', '30'
   const [sheetLayout, setSheetLayout] = useState('opalina16');
+  const [showResetSkuModal, setShowResetSkuModal] = useState(false);
+  const [targetResetNumber, setTargetResetNumber] = useState('1');
+  const [isResettingSku, setIsResettingSku] = useState(false);
+
+  const handleResetSku = async (targetNum) => {
+    try {
+      setIsResettingSku(true);
+      const parsed = Math.max(1, parseInt(targetNum, 10) || 1);
+      const newNext = await resetSkuSequence(parsed);
+      setNextStartSeq(newNext);
+      setShowResetSkuModal(false);
+    } catch (err) {
+      alert("Error al reiniciar contador: " + (err.message || err));
+    } finally {
+      setIsResettingSku(false);
+    }
+  };
   const isOpalina = sheetLayout.startsWith('opalina');
   const isLandscape = sheetLayout === 'opalina15' || sheetLayout === 'opalina10' || sheetLayout === 'opalina8';
 
@@ -916,8 +933,32 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
                     borderRadius: '8px',
                     padding: '0.8rem'
                   }}>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '0.25rem' }}>
-                      Rango de SKUs único y consecutivo:
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                        Rango de SKUs único y consecutivo:
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetResetNumber(String(nextStartSeq || 1));
+                          setShowResetSkuModal(true);
+                        }}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid #38bdf8',
+                          color: '#38bdf8',
+                          borderRadius: '4px',
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <RotateCcw size={11} /> Reiniciar Folio
+                      </button>
                     </div>
                     <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace' }}>
                       ALN-{String(nextStartSeq).padStart(5, '0')} <span style={{ color: '#94a3b8' }}>➔</span> ALN-{String(nextStartSeq + blankCount - 1).padStart(5, '0')}
@@ -1574,6 +1615,154 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Modal para reiniciar o ajustar folio de etiquetas */}
+      {showResetSkuModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100002,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            maxWidth: '420px',
+            width: '100%',
+            color: '#f8fafc',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <RotateCcw size={18} /> Reiniciar Folio de Etiquetas
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setShowResetSkuModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '1rem', lineHeight: 1.4 }}>
+              Escribe desde qué número deseas que comience la siguiente etiqueta consecutiva (ej. <strong>1</strong> para empezar en <code>ALN-00001</code>).
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setTargetResetNumber('1')}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  backgroundColor: targetResetNumber === '1' ? 'rgba(56, 189, 248, 0.2)' : '#1e293b',
+                  border: targetResetNumber === '1' ? '1px solid #38bdf8' : '1px solid #334155',
+                  color: targetResetNumber === '1' ? '#38bdf8' : '#cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Poner en 1 (ALN-00001)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTargetResetNumber('1001')}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  backgroundColor: targetResetNumber === '1001' ? 'rgba(56, 189, 248, 0.2)' : '#1e293b',
+                  border: targetResetNumber === '1001' ? '1px solid #38bdf8' : '1px solid #334155',
+                  color: targetResetNumber === '1001' ? '#38bdf8' : '#cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Poner en 1001 (ALN-01001)
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+                Número inicial deseado:
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="99999"
+                value={targetResetNumber}
+                onChange={(e) => setTargetResetNumber(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.75rem',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #475569',
+                  borderRadius: '6px',
+                  color: '#f8fafc',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  fontFamily: 'monospace',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '0.35rem', fontFamily: 'monospace' }}>
+                Próximo código: ALN-{String(Math.max(1, parseInt(targetResetNumber, 10) || 1)).padStart(5, '0')}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowResetSkuModal(false)}
+                disabled={isResettingSku}
+                style={{
+                  padding: '0.55rem 1rem',
+                  backgroundColor: '#334155',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#cbd5e1',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleResetSku(targetResetNumber)}
+                disabled={isResettingSku}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  backgroundColor: '#0284c7',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {isResettingSku ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                {isResettingSku ? 'Guardando...' : 'Guardar y Reiniciar Folio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PORTAL EXCLUSIVO DE IMPRESIÓN (Aislado totalmente del resto de la página) */}
       {createPortal(
