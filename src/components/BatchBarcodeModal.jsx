@@ -52,7 +52,7 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
           border: isPrint ? 'none' : '1px dashed #cbd5e1', 
           visibility: isPrint ? 'hidden' : 'visible',
           height: '100%',
-          minHeight: isPrint ? (isLargeHangtag ? '93mm' : (isOpalina12 ? '76mm' : (isOpalina16 ? '56mm' : (sheetLayout === 'opalina9' ? '68mm' : '48mm')))) : (isOpalina16 ? '160px' : '190px'),
+          minHeight: isPrint ? (isLargeHangtag ? '91mm' : (isOpalina12 ? '74mm' : (isOpalina16 ? '53mm' : (sheetLayout === 'opalina9' ? '68mm' : '48mm')))) : (isOpalina16 ? '160px' : '190px'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -75,11 +75,11 @@ function OpalinaHangtagItem({ item, sheetLayout = 'opalina16', isPrint = false }
   const itemSize = (item.size || '').toUpperCase().trim();
 
   const logoSize = isPrint 
-    ? (isLargeHangtag ? '36mm' : (isOpalina12 ? '28mm' : (isOpalina16 ? '23mm' : (isOpalina9 ? '26mm' : (isOpalina20 ? '16mm' : '22mm')))))
+    ? (isLargeHangtag ? '36mm' : (isOpalina12 ? '28mm' : (isOpalina16 ? '20mm' : (isOpalina9 ? '26mm' : (isOpalina20 ? '16mm' : '22mm')))))
     : (isLargeHangtag ? '106px' : (isOpalina12 ? '86px' : (isOpalina16 ? '70px' : (isOpalina9 ? '82px' : (isOpalina20 ? '54px' : '72px')))));
 
   const barcodeH = isPrint 
-    ? (isLargeHangtag ? 19 : (isOpalina12 ? 15 : (isOpalina16 ? 12 : (isOpalina9 ? 14 : (isOpalina20 ? 8 : 12))))) 
+    ? (isLargeHangtag ? 19 : (isOpalina12 ? 15 : (isOpalina16 ? 10 : (isOpalina9 ? 14 : (isOpalina20 ? 8 : 12))))) 
     : (isLargeHangtag ? 20 : (isOpalina16 ? 14 : 15));
 
   return (
@@ -485,23 +485,76 @@ export default function BatchBarcodeModal({ products = [], onClose }) {
       document.head.appendChild(styleTag);
     }
 
+    const pageWidth = isLandscape ? '279.4mm' : '215.9mm';
+    const pageHeight = isLandscape ? '215.9mm' : '279.4mm';
     if (isLandscape) {
       document.body.classList.add('batch-printing-landscape');
-      styleTag.innerHTML = `
-        @page {
-          size: landscape;
-          margin: 0;
-        }
-      `;
     } else {
       document.body.classList.remove('batch-printing-landscape');
-      styleTag.innerHTML = `
-        @page {
-          size: portrait;
-          margin: 0;
-        }
-      `;
     }
+
+    styleTag.innerHTML = `
+      @media print {
+        @page {
+          size: ${isLandscape ? 'landscape' : 'portrait'};
+          margin: 0mm;
+        }
+        html, body {
+          margin: 0mm !important;
+          padding: 0mm !important;
+          background: #ffffff !important;
+          width: ${pageWidth} !important;
+          height: ${pageHeight} !important;
+          overflow: visible !important;
+        }
+        body > *:not(#batch-print-portal),
+        #root,
+        .modal-overlay {
+          display: none !important;
+          visibility: hidden !important;
+          height: 0 !important;
+          max-height: 0 !important;
+          overflow: hidden !important;
+        }
+        #batch-print-portal {
+          display: block !important;
+          visibility: visible !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: ${pageWidth} !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+        }
+        #batch-print-portal * {
+          visibility: visible !important;
+        }
+        .batch-print-page {
+          box-sizing: border-box !important;
+          width: ${pageWidth} !important;
+          height: ${pageHeight} !important;
+          max-height: ${pageHeight} !important;
+          margin: 0 auto !important;
+          page-break-before: always !important;
+          break-before: page !important;
+          page-break-after: always !important;
+          break-after: page !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          overflow: hidden !important;
+          background: #ffffff !important;
+        }
+        .batch-print-page:first-child {
+          page-break-before: avoid !important;
+          break-before: avoid !important;
+        }
+        .batch-print-page:last-child {
+          page-break-after: avoid !important;
+          break-after: avoid !important;
+        }
+      }
+    `;
 
     return () => {
       document.body.classList.remove('batch-printing-active');

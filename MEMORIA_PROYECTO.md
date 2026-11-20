@@ -369,6 +369,19 @@ Resuelve la velocidad de captura diferenciando las necesidades de mostrador vs t
   * **Alternativa Mediana: `Opalina 12 (Carta Vertical 4x3)`:** 4 columnas × 3 filas = 12 etiquetas (46.5 mm × 76 mm) para prendas que requieran etiqueta un poco más alta.
   * **Alternativa Grande: `Opalina 8 (Carta Horizontal 4x2)`:** 4 columnas × 2 filas = 8 etiquetas (63 mm × 93 mm).
 
+### HH. Blindaje de Paginación Exacta y Corrección de Encimado en Impresión
+* **El Problema Detectado al Imprimir 80 Etiquetas (5 Páginas):**
+  * La página 1 salía bien con 16 etiquetas.
+  * La página 2 salía con 20 etiquetas: las etiquetas 29-32 salían cortadas a la mitad (solo el logo) y las etiquetas 33-36 (de la página 3) se imprimían encimadas sobre ellas.
+  * Esto se repetía en las páginas pares y la última salía cortada.
+* **Causa Raíz:**
+  1. La altura de las etiquetas (59 mm) más los márgenes superaba el espacio de la hoja antes del margen inferior de la impresora HP, forzando un salto de página a la mitad del cuarto renglón.
+  2. Los elementos de la aplicación web de fondo no tenían `display: none !important;` en impresión, empujando el flujo vertical y causando que el motor de Chrome encimara el inicio de la siguiente página sobre el desborde de la anterior.
+* **Solución Implementada:**
+  1. **Aislamiento Total de Impresión:** `body > *:not(#batch-print-portal), #root { display: none !important; }` elimina por completo la interfaz del POS durante la impresión para que la altura de la página arranque en cero exacto.
+  2. **Dimensiones Físicas Exactas por Hoja (`215.9 mm × 279.4 mm`):** Cada página `.batch-print-page` se dimensiona al 100% de la hoja Carta con `page-break-before: always` y `page-break-after: always`.
+  3. **Calibración Antidesborde:** Cada fila se redujo a 54 mm de alto con logo de 20 mm y código de 10 mm, y se asignaron 24 mm de margen vertical seguro (superior e inferior). De esta manera, el cuarto renglón queda 100% dentro del área segura de la impresora y cada página contiene matemáticamente 16 etiquetas sin desbordes ni encimados.
+
 ---
 
 ## 📋 5. Comandos y Flujos de Trabajo Frecuentes

@@ -853,13 +853,28 @@
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
+/* Reglas de impresión para Etiquetas en Lote */
+@media print {
+  body.batch-printing-active > *:not(#batch-print-portal),
+  body.batch-printing-active #root,
+  body.batch-printing-active .pos-receipt-modal {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+  }
+  body.batch-printing-active #batch-print-portal,
+  body.batch-printing-active #batch-print-portal * {
+    visibility: visible !important;
+  }
+}
+
 /* Reglas de impresión para Tickets de Venta y Tickets de Corte de Turno (Térmicas 58mm y 80mm) */
 @media print {
-  body * {
+  body:not(.batch-printing-active) * {
     visibility: hidden;
   }
-  .pos-receipt-modal,
-  .pos-receipt-modal * {
+  body:not(.batch-printing-active) .pos-receipt-modal,
+  body:not(.batch-printing-active) .pos-receipt-modal * {
     visibility: visible !important;
   }
   .pos-receipt-modal {
